@@ -1,0 +1,16 @@
+.nodos-page { padding: 40px; background: #f0f2f5; min-height: 100vh; font-family: 'Inter', sans-serif; }
+.nodos-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-top: 30px; }
+.nodo-card { background: white; padding: 30px; border-radius: 15px; text-align: center; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); border-top: 6px solid #cbd5e0; transition: 0.3s; }
+.nodo-card.online { border-top-color: #48bb78; }
+.nodo-card.offline { border-top-color: #f56565; opacity: 0.8; background: #fff5f5; }
+
+.nodo-icon { font-size: 3rem; margin-bottom: 15px; }
+.btn-group { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+.btn-node { padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+
+.btn-off { background: #fed7d7; color: #822727; }
+.btn-off:hover { background: #feb2b2; }
+.btn-reset { background: #ebf8ff; color: #2b6cb0; border: 1px solid #bee3f8; }
+.btn-on { background: #c6f6d5; color: #22543d; }
+
+.alerta-seguridad { margin-top: 30px; padding: 20px; background: #fffaf0; border-left: 5px solid #ed8936; border-radius: 8px; color: #7b341e; font-size: 0.9rem; }

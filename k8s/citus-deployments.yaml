@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: citus-coordinator
+spec:
+  selector:
+    app: citus-coordinator
+  ports:
+  - protocol: TCP
+    port: 5432
+    targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: citus-coordinator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: citus-coordinator
+  template:
+    metadata:
+      labels:
+        app: citus-coordinator
+    spec:
+      containers:
+      - name: citus
+        image: citusdata/citus:11.4
+        env:
+        - name: POSTGRES_USER
+          value: myuser
+        - name: POSTGRES_PASSWORD
+          value: mypass
+        - name: POSTGRES_DB
+          value: clinic
+        ports:
+        - containerPort: 5432
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: citus-worker-1
+spec:
+  selector:
+    app: citus-worker-1
+  ports:
+  - protocol: TCP
+    port: 5432
+    targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: citus-worker-1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: citus-worker-1
+  template:
+    metadata:
+      labels:
+        app: citus-worker-1
+    spec:
+      containers:
+      - name: citus
+        image: citusdata/citus:11.4
+        env:
+        - name: POSTGRES_USER
+          value: myuser
+        - name: POSTGRES_PASSWORD
+          value: mypass
+        - name: POSTGRES_DB
+          value: clinic
+        ports:
+        - containerPort: 5432

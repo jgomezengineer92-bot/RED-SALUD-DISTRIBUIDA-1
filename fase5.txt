@@ -1,0 +1,56 @@
+=== Consulta Transparente ===
+ documento_id |          nombre_completo          | municipio_residencia 
+--------------+-----------------------------------+----------------------
+   1807949924 | Jessica Candelaria Canales Gárate | León
+   2739427151 | Tadeo Falcó Gascón                | Tarragona
+   3011288776 | Abilio Ferrera Chacón             | Córdoba
+   3524351848 | Jose Manuel Reguera-Pallarès      | Almería
+   4200621587 | Ariadna Valderrama Montenegro     | Salamanca
+   5444459189 | Chuy Granados                     | Cádiz
+   7100168051 | Jaider Enrique Reyes Herazo       | Alicante
+   7712565174 | Jovita Villalobos Cordero         | Lugo
+   8851083276 | Sebastián Zamorano Terrón         | Guadalajara
+   9307000778 | Ariadna Valderrama-Ibarra         | Huelva
+(10 rows)
+
+=== JOIN Colocation ===
+       nombre_completo       |       entidad_salud        |     causa_atencion      |       medico        |   especialidad   
+-----------------------------+----------------------------+-------------------------+---------------------+------------------
+ Ariadna Valderrama-Ibarra   | Hospital Central de Bogotá | Dolor torácico agudo    | Dr. Carlos Martínez | Medicina General
+ Jaider Enrique Reyes Herazo | Clínica del Norte          | Control de hipertensión | Dra. María López    | Cardiología
+(2 rows)
+
+=== EXPLAIN ===
+                                      QUERY PLAN                                      
+--------------------------------------------------------------------------------------
+ Custom Scan (Citus Adaptive)  (cost=0.00..0.00 rows=100000 width=2073)
+   Task Count: 32
+   Tasks Shown: One of 32
+   ->  Task
+         Node: host=citus_worker1 port=5432 dbname=historia_clinica
+         ->  Seq Scan on usuario_102008 usuario  (cost=0.00..10.38 rows=1 width=2073)
+               Filter: ((municipio_residencia)::text = 'Sincelejo'::text)
+(7 rows)
+
+=== Autonomia Worker 1 ===
+     tablename     
+-------------------
+ usuario
+ atencion
+ tecnologia_salud
+ diagnostico
+ egreso
+ profesional_salud
+(6 rows)
+
+=== Autonomia Worker 2 ===
+     tablename     
+-------------------
+ usuario
+ atencion
+ tecnologia_salud
+ diagnostico
+ egreso
+ profesional_salud
+(6 rows)
+

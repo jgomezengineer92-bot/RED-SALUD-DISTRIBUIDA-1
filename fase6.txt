@@ -1,0 +1,162 @@
+=== Fase 6: Tolerancia a Fallos ===
+--- Subfase A: Baseline ---
+     nodename      | nodeport | isactive 
+-------------------+----------+----------
+ citus_coordinator |     5432 | t
+ citus_worker1     |     5432 | t
+ citus_worker2     |     5432 | t
+(3 rows)
+
+ shardid |   nodename    | shardstate 
+---------+---------------+------------
+  102008 | citus_worker1 |          1
+  102009 | citus_worker2 |          1
+  102010 | citus_worker1 |          1
+  102011 | citus_worker2 |          1
+  102012 | citus_worker1 |          1
+  102013 | citus_worker2 |          1
+  102014 | citus_worker1 |          1
+  102015 | citus_worker2 |          1
+  102016 | citus_worker1 |          1
+  102017 | citus_worker2 |          1
+(10 rows)
+
+ total_pacientes 
+-----------------
+              10
+(1 row)
+
+--- Subfase B: Detener worker1 ---
+ERROR:  connection to the remote node citus_worker1:5432 failed with the following error: could not translate host name "citus_worker1" to address: Name or service not known
+--- Subfase C: Diagnóstico ---
+WARNING:  connection to the remote node citus_worker1:5432 failed with the following error: could not translate host name "citus_worker1" to address: Name or service not known
+       tabla       | shardid |  nodo_caido   | shardstate | estado 
+-------------------+---------+---------------+------------+--------
+ usuario           |  102008 | citus_worker1 |          1 | ACTIVO
+ usuario           |  102010 | citus_worker1 |          1 | ACTIVO
+ usuario           |  102012 | citus_worker1 |          1 | ACTIVO
+ usuario           |  102014 | citus_worker1 |          1 | ACTIVO
+ usuario           |  102016 | citus_worker1 |          1 | ACTIVO
+ usuario           |  102018 | citus_worker1 |          1 | ACTIVO
+ usuario           |  102020 | citus_worker1 |          1 | ACTIVO
+ usuario           |  102022 | citus_worker1 |          1 | ACTIVO
+ usuario           |  102024 | citus_worker1 |          1 | ACTIVO
+ usuario           |  102026 | citus_worker1 |          1 | ACTIVO
+ usuario           |  102028 | citus_worker1 |          1 | ACTIVO
+ usuario           |  102030 | citus_worker1 |          1 | ACTIVO
+ usuario           |  102032 | citus_worker1 |          1 | ACTIVO
+ usuario           |  102034 | citus_worker1 |          1 | ACTIVO
+ usuario           |  102036 | citus_worker1 |          1 | ACTIVO
+ usuario           |  102038 | citus_worker1 |          1 | ACTIVO
+ atencion          |  102040 | citus_worker1 |          1 | ACTIVO
+ atencion          |  102042 | citus_worker1 |          1 | ACTIVO
+ atencion          |  102044 | citus_worker1 |          1 | ACTIVO
+ atencion          |  102046 | citus_worker1 |          1 | ACTIVO
+ atencion          |  102048 | citus_worker1 |          1 | ACTIVO
+ atencion          |  102050 | citus_worker1 |          1 | ACTIVO
+ atencion          |  102052 | citus_worker1 |          1 | ACTIVO
+ atencion          |  102054 | citus_worker1 |          1 | ACTIVO
+ atencion          |  102056 | citus_worker1 |          1 | ACTIVO
+ atencion          |  102058 | citus_worker1 |          1 | ACTIVO
+ atencion          |  102060 | citus_worker1 |          1 | ACTIVO
+ atencion          |  102062 | citus_worker1 |          1 | ACTIVO
+ atencion          |  102064 | citus_worker1 |          1 | ACTIVO
+ atencion          |  102066 | citus_worker1 |          1 | ACTIVO
+ atencion          |  102068 | citus_worker1 |          1 | ACTIVO
+ atencion          |  102070 | citus_worker1 |          1 | ACTIVO
+ tecnologia_salud  |  102072 | citus_worker1 |          1 | ACTIVO
+ tecnologia_salud  |  102074 | citus_worker1 |          1 | ACTIVO
+ tecnologia_salud  |  102076 | citus_worker1 |          1 | ACTIVO
+ tecnologia_salud  |  102078 | citus_worker1 |          1 | ACTIVO
+ tecnologia_salud  |  102080 | citus_worker1 |          1 | ACTIVO
+ tecnologia_salud  |  102082 | citus_worker1 |          1 | ACTIVO
+ tecnologia_salud  |  102084 | citus_worker1 |          1 | ACTIVO
+ tecnologia_salud  |  102086 | citus_worker1 |          1 | ACTIVO
+ tecnologia_salud  |  102088 | citus_worker1 |          1 | ACTIVO
+ tecnologia_salud  |  102090 | citus_worker1 |          1 | ACTIVO
+ tecnologia_salud  |  102092 | citus_worker1 |          1 | ACTIVO
+ tecnologia_salud  |  102094 | citus_worker1 |          1 | ACTIVO
+ tecnologia_salud  |  102096 | citus_worker1 |          1 | ACTIVO
+ tecnologia_salud  |  102098 | citus_worker1 |          1 | ACTIVO
+ tecnologia_salud  |  102100 | citus_worker1 |          1 | ACTIVO
+ tecnologia_salud  |  102102 | citus_worker1 |          1 | ACTIVO
+ diagnostico       |  102104 | citus_worker1 |          1 | ACTIVO
+ diagnostico       |  102106 | citus_worker1 |          1 | ACTIVO
+ diagnostico       |  102108 | citus_worker1 |          1 | ACTIVO
+ diagnostico       |  102110 | citus_worker1 |          1 | ACTIVO
+ diagnostico       |  102112 | citus_worker1 |          1 | ACTIVO
+ diagnostico       |  102114 | citus_worker1 |          1 | ACTIVO
+ diagnostico       |  102116 | citus_worker1 |          1 | ACTIVO
+ diagnostico       |  102118 | citus_worker1 |          1 | ACTIVO
+ diagnostico       |  102120 | citus_worker1 |          1 | ACTIVO
+ diagnostico       |  102122 | citus_worker1 |          1 | ACTIVO
+ diagnostico       |  102124 | citus_worker1 |          1 | ACTIVO
+ diagnostico       |  102126 | citus_worker1 |          1 | ACTIVO
+ diagnostico       |  102128 | citus_worker1 |          1 | ACTIVO
+ diagnostico       |  102130 | citus_worker1 |          1 | ACTIVO
+ diagnostico       |  102132 | citus_worker1 |          1 | ACTIVO
+ diagnostico       |  102134 | citus_worker1 |          1 | ACTIVO
+ egreso            |  102136 | citus_worker1 |          1 | ACTIVO
+ egreso            |  102138 | citus_worker1 |          1 | ACTIVO
+ egreso            |  102140 | citus_worker1 |          1 | ACTIVO
+ egreso            |  102142 | citus_worker1 |          1 | ACTIVO
+ egreso            |  102144 | citus_worker1 |          1 | ACTIVO
+ egreso            |  102146 | citus_worker1 |          1 | ACTIVO
+ egreso            |  102148 | citus_worker1 |          1 | ACTIVO
+ egreso            |  102150 | citus_worker1 |          1 | ACTIVO
+ egreso            |  102152 | citus_worker1 |          1 | ACTIVO
+ egreso            |  102154 | citus_worker1 |          1 | ACTIVO
+ egreso            |  102156 | citus_worker1 |          1 | ACTIVO
+ egreso            |  102158 | citus_worker1 |          1 | ACTIVO
+ egreso            |  102160 | citus_worker1 |          1 | ACTIVO
+ egreso            |  102162 | citus_worker1 |          1 | ACTIVO
+ egreso            |  102164 | citus_worker1 |          1 | ACTIVO
+ egreso            |  102166 | citus_worker1 |          1 | ACTIVO
+ profesional_salud |  102168 | citus_worker1 |          1 | ACTIVO
+ profesional_salud |  102168 | citus_worker1 |          1 | ACTIVO
+ profesional_salud |  102168 | citus_worker1 |          1 | ACTIVO
+(83 rows)
+
+--- Subfase D: Consultas con nodo caído ---
+ERROR:  connection to the remote node citus_worker1:5432 failed with the following error: could not translate host name "citus_worker1" to address: Name or service not known
+          id_personal_salud           |       nombre        |   especialidad   
+--------------------------------------+---------------------+------------------
+ a1b2c3d4-e5f6-7890-abcd-ef1234567890 | Dr. Carlos Martínez | Medicina General
+ b2c3d4e5-f6a7-8901-bcde-f12345678901 | Dra. María López    | Cardiología
+ c3d4e5f6-a7b8-9012-cdef-123456789012 | Dr. Pedro Sánchez   | Pediatría
+(3 rows)
+
+ tablename 
+-----------
+ usuario
+ atencion
+(2 rows)
+
+--- Subfase E: Recuperar nodo ---
+ citus_activate_node 
+---------------------
+                   2
+(1 row)
+
+ shardstate | count 
+------------+-------
+          1 |   163
+(1 row)
+
+--- Subfase F: Verificación final ---
+   node_name   | node_port 
+---------------+-----------
+ citus_worker1 |      5432
+ citus_worker2 |      5432
+(2 rows)
+
+ count 
+-------
+    10
+(1 row)
+
+ shardstate 
+------------
+          1
+(1 row)
+

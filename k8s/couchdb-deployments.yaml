@@ -1,0 +1,171 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: guajira-db
+spec:
+  selector:
+    app: guajira-db
+  ports:
+  - protocol: TCP
+    port: 5984
+    targetPort: 5984
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: guajira-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: guajira-db
+  template:
+    metadata:
+      labels:
+        app: guajira-db
+    spec:
+      containers:
+      - name: couchdb
+        image: couchdb:latest
+        env:
+        - name: COUCHDB_USER
+          value: admin
+        - name: COUCHDB_PASSWORD
+          value: admin
+        ports:
+        - containerPort: 5984
+        volumeMounts:
+        - name: data
+          mountPath: /opt/couchdb/data
+      volumes:
+      - name: data
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: amazonas-db
+spec:
+  selector:
+    app: amazonas-db
+  ports:
+  - protocol: TCP
+    port: 5984
+    targetPort: 5984
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: amazonas-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: amazonas-db
+  template:
+    metadata:
+      labels:
+        app: amazonas-db
+    spec:
+      containers:
+      - name: couchdb
+        image: couchdb:latest
+        env:
+        - name: COUCHDB_USER
+          value: admin123
+        - name: COUCHDB_PASSWORD
+          value: admin123
+        ports:
+        - containerPort: 5984
+        volumeMounts:
+        - name: data
+          mountPath: /opt/couchdb/data
+      volumes:
+      - name: data
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: guainia-db
+spec:
+  selector:
+    app: guainia-db
+  ports:
+  - protocol: TCP
+    port: 5984
+    targetPort: 5984
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: guainia-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: guainia-db
+  template:
+    metadata:
+      labels:
+        app: guainia-db
+    spec:
+      containers:
+      - name: couchdb
+        image: couchdb:latest
+        env:
+        - name: COUCHDB_USER
+          value: admin
+        - name: COUCHDB_PASSWORD
+          value: admin
+        ports:
+        - containerPort: 5984
+        volumeMounts:
+        - name: data
+          mountPath: /opt/couchdb/data
+      volumes:
+      - name: data
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: narino-db
+spec:
+  selector:
+    app: narino-db
+  ports:
+  - protocol: TCP
+    port: 5984
+    targetPort: 5984
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: narino-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: narino-db
+  template:
+    metadata:
+      labels:
+        app: narino-db
+    spec:
+      containers:
+      - name: couchdb
+        image: couchdb:latest
+        env:
+        - name: COUCHDB_USER
+          value: admin
+        - name: COUCHDB_PASSWORD
+          value: admin
+        ports:
+        - containerPort: 5984
+        volumeMounts:
+        - name: data
+          mountPath: /opt/couchdb/data
+      volumes:
+      - name: data
+        emptyDir: {}

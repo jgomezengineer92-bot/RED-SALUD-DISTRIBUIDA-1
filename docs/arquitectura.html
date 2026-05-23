@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arquitectura P2P — Red Salud Distribuida</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --bg:#060b14;
+  --surface:#0d1526;
+  --border:#162040;
+  --text:#e2e8f0;
+  --muted:#475569;
+}
+body {
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Inter',sans-serif;
+  min-height:100vh;
+  overflow:hidden;
+}
+
+/* ── ANIMATED BG ── */
+.bg-stars {
+  position:fixed; inset:0; z-index:0;
+  background: radial-gradient(ellipse at 20% 50%, #0d2240 0%, transparent 60%),
+              radial-gradient(ellipse at 80% 20%, #0a1a35 0%, transparent 50%),
+              var(--bg);
+}
+
+/* ── HEADER ── */
+header {
+  position:fixed; top:0; left:0; right:0; z-index:100;
+  background:rgba(6,11,20,0.85);
+  backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  padding:18px 36px;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.htitle h1 {
+  font-size:1.25rem; font-weight:800;
+  background:linear-gradient(135deg,#38bdf8,#818cf8,#34d399);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+.htitle p { font-size:0.72rem; color:var(--muted); margin-top:3px; }
+
+.status-bar {
+  display:flex; gap:16px; align-items:center;
+}
+.status-dot {
+  width:8px; height:8px; border-radius:50%;
+  animation:pulse-dot 2s infinite;
+}
+@keyframes pulse-dot {
+  0%,100%{opacity:1; transform:scale(1);}
+  50%{opacity:0.5; transform:scale(1.3);}
+}
+.status-item { display:flex; align-items:center; gap:6px; font-size:0.72rem; color:var(--muted); }
+
+/* ── CANVAS ── */
+#arch-canvas {
+  position:fixed;
+  top:0; left:0;
+  width:100vw; height:100vh;
+  z-index:1;
+}
+
+/* ── INFO PANEL ── */
+#info-panel {
+  position:fixed;
+  right:24px; top:80px;
+  width:280px;
+  background:rgba(13,21,38,0.9);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:20px;
+  z-index:200;
+  backdrop-filter:blur(20px);
+  transition:all 0.3s;
+}
+.panel-title {
+  font-size:0.85rem; font-weight:700; color:#38bdf8;
+  margin-bottom:16px; padding-bottom:10px;
+  border-bottom:1px solid var(--border);
+}
+.legend-grid { display:flex; flex-direction:column; gap:10px; }
+.leg-row { display:flex; align-items:center; gap:10px; }
+.leg-icon {
+  width:36px; height:36px; border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:1.1rem; flex-shrink:0;
+}
+.leg-info { flex:1; }
+.leg-name { font-size:0.78rem; font-weight:600; }
+.leg-desc { font-size:0.68rem; color:var(--muted); margin-top:1px; }
+
+.divider { height:1px; background:var(--border); margin:14px 0; }
+
+.stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.stat-box {
+  background:rgba(255,255,255,0.03);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:10px 12px;
+  text-align:center;
+}
+.stat-n { font-size:1.3rem; font-weight:700; }
+.stat-l { font-size:0.65rem; color:var(--muted); margin-top:2px; }
+
+/* ── TOOLTIP ── */
+#tooltip {
+  position:fixed; z-index:500;
+  background:rgba(13,21,38,0.95);
+  border:1px solid #1e3a5f;
+  border-radius:12px;
+  padding:12px 16px;
+  font-size:0.78rem;
+  pointer-events:none;
+  opacity:0; transition:opacity 0.15s;
+  max-width:220px; line-height:1.6;
+  box-shadow:0 8px 32px rgba(0,0,0,0.6);
+}
+#tooltip.show{opacity:1;}
+.tip-name{font-weight:700;margin-bottom:4px;font-size:0.82rem;}
+.tip-tech{color:#64748b;font-size:0.7rem;}
+
+/* ── CONTROLS ── */
+.controls {
+  position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+  display:flex; gap:8px; z-index:200;
+  background:rgba(13,21,38,0.9);
+  border:1px solid var(--border);
+  border-radius:100px;
+  padding:8px 16px;
+  backdrop-filter:blur(20px);
+}
+.ctrl-chip {
+  background:transparent; border:none; color:var(--muted);
+  font-size:0.72rem; font-family:'Inter';
+  cursor:pointer; padding:4px 10px; border-radius:100px;
+  transition:all 0.2s;
+}
+.ctrl-chip:hover,.ctrl-chip.active { background:#1e3a5f; color:var(--text); }
+.ctrl-sep { color:var(--border); font-size:0.8rem; display:flex; align-items:center; }
+
+@media print {
+  header,.controls,#info-panel { display:none !important; }
+  body { background:white; }
+}
+</style>
+</head>
+<body>
+<div class="bg-stars"></div>
+
+<header>
+  <div class="htitle">
+    <h1>🌐 Arquitectura P2P — Red Salud Distribuida</h1>
+    <p>4 nodos geográficos &nbsp;|&nbsp; PostgreSQL Citus &nbsp;|&nbsp; etcd &nbsp;|&nbsp; CouchDB &nbsp;|&nbsp; Colombia</p>
+  </div>
+  <div class="status-bar">
+    <div class="status-item"><div class="status-dot" style="background:#22c55e"></div>4 Nodos activos</div>
+    <div class="status-item"><div class="status-dot" style="background:#3b82f6;animation-delay:0.3s"></div>Citus Coordinator</div>
+    <div class="status-item"><div class="status-dot" style="background:#f59e0b;animation-delay:0.6s"></div>etcd Consenso</div>
+  </div>
+</header>
+
+<canvas id="arch-canvas"></canvas>
+
+<div id="info-panel">
+  <div class="panel-title">📐 Componentes del Sistema</div>
+  <div class="legend-grid">
+    <div class="leg-row">
+      <div class="leg-icon" style="background:#0d1f3c;border:1px solid #1d4ed8">🖥️</div>
+      <div class="leg-info"><div class="leg-name" style="color:#60a5fa">Frontend React</div><div class="leg-desc">Puerto 3000 — UI del sistema</div></div>
+    </div>
+    <div class="leg-row">
+      <div class="leg-icon" style="background:#0d241e;border:1px solid #065f46">⚡</div>
+      <div class="leg-info"><div class="leg-name" style="color:#34d399">Backend Python</div><div class="leg-desc">Puerto 5000-5003 — API REST</div></div>
+    </div>
+    <div class="leg-row">
+      <div class="leg-icon" style="background:#2d1d00;border:1px solid #92400e">🗄️</div>
+      <div class="leg-info"><div class="leg-name" style="color:#fbbf24">CouchDB Nodo</div><div class="leg-desc">Base de datos local P2P</div></div>
+    </div>
+    <div class="leg-row">
+      <div class="leg-icon" style="background:#1a0a2e;border:1px solid #5b21b6">🐘</div>
+      <div class="leg-info"><div class="leg-name" style="color:#a78bfa">Citus Coordinator</div><div class="leg-desc">PostgreSQL distribuido</div></div>
+    </div>
+    <div class="leg-row">
+      <div class="leg-icon" style="background:#1c0a0a;border:1px solid #991b1b">⚙️</div>
+      <div class="leg-info"><div class="leg-name" style="color:#f87171">etcd</div><div class="leg-desc">Consenso distribuido</div></div>
+    </div>
+  </div>
+  <div class="divider"></div>
+  <div class="stats-grid">
+    <div class="stat-box"><div class="stat-n" style="color:#34d399">4</div><div class="stat-l">Nodos P2P</div></div>
+    <div class="stat-box"><div class="stat-n" style="color:#60a5fa">57</div><div class="stat-l">Campos Res.866</div></div>
+    <div class="stat-box"><div class="stat-n" style="color:#a78bfa">CAP</div><div class="stat-l">AP prioritario</div></div>
+    <div class="stat-box"><div class="stat-n" style="color:#fbbf24">P2P</div><div class="stat-l">Sin servidor central</div></div>
+  </div>
+  <div class="divider"></div>
+  <div style="font-size:0.68rem;color:var(--muted);line-height:1.6">
+    💡 Pasa el cursor sobre los nodos para ver detalles.<br>
+    Las líneas animadas muestran el flujo de datos.<br>🖨️ Ctrl+P para exportar PDF
+  </div>
+</div>
+
+<div id="tooltip"><div class="tip-name" id="tip-name"></div><div class="tip-tech" id="tip-tech"></div></div>
+
+<div class="controls">
+  <button class="ctrl-chip active" id="btn-anim">⚡ Animaciones</button>
+  <span class="ctrl-sep">|</span>
+  <button class="ctrl-chip" id="btn-labels">🏷️ Etiquetas</button>
+  <span class="ctrl-sep">|</span>
+  <button class="ctrl-chip" id="btn-theme">🌙 Modo Aula</button>
+  <span class="ctrl-sep">|</span>
+  <span class="ctrl-chip" style="cursor:default;color:#475569">Scroll = zoom &nbsp;·&nbsp; Drag = mover</span>
+</div>
+
+<script>
+const canvas = document.getElementById('arch-canvas');
+const ctx = canvas.getContext('2d');
+
+let W = window.innerWidth, H = window.innerHeight;
+let scale = 1, tx = 0, ty = 0;
+let dragging = false;
+let animEnabled = true, labelsEnabled = false;
+let lightMode = false;
+let time = 0;
+let hoveredNode = null;
+
+// ── NODES ──
+const NODES = [
+  {
+    id:'frontend', label:'Frontend', sublabel:'React · Puerto 3000',
+    emoji:'🖥️', color:'#3b82f6', glow:'#1d4ed8', bg:'#0d1f3c',
+    tech:['React 18','Axios','CSS Modules'],
+    desc:'Interfaz de usuario para registro y consulta de historias clínicas. Se comunica con los nodos API vía REST.',
+    shape:'rect',
+  },
+  {
+    id:'guajira', label:'Nodo La Guajira', sublabel:'API :5000 · CouchDB :5984',
+    emoji:'🏖️', color:'#22c55e', glow:'#15803d', bg:'#0d241e',
+    tech:['Python FastAPI','CouchDB 3.3','Docker'],
+    desc:'Nodo P2P ubicado en La Guajira. Almacena historias clínicas localmente y replica a otros nodos según disponibilidad.',
+    shape:'hex',
+  },
+  {
+    id:'amazonas', label:'Nodo Amazonas', sublabel:'API :5001 · CouchDB :5985',
+    emoji:'🌿', color:'#10b981', glow:'#065f46', bg:'#022c22',
+    tech:['Python FastAPI','CouchDB 3.3','Docker'],
+    desc:'Nodo P2P ubicado en el Amazonas. Opera de forma autónoma incluso sin conexión al coordinador.',
+    shape:'hex',
+  },
+  {
+    id:'guainia', label:'Nodo Guainía', sublabel:'API :5002 · CouchDB :5986',
+    emoji:'🌊', color:'#06b6d4', glow:'#0e7490', bg:'#0c1a2e',
+    tech:['Python FastAPI','CouchDB 3.3','Docker'],
+    desc:'Nodo P2P en Guainía. Atiende zonas de baja conectividad con cache local y sync diferida.',
+    shape:'hex',
+  },
+  {
+    id:'narino', label:'Nodo Nariño', sublabel:'API :5003 · CouchDB :5987',
+    emoji:'🏔️', color:'#8b5cf6', glow:'#5b21b6', bg:'#1a0a2e',
+    tech:['Python FastAPI','CouchDB 3.3','Docker'],
+    desc:'Nodo P2P en Nariño. Comparte estado con los otros nodos mediante sincronización asíncrona CouchDB.',
+    shape:'hex',
+  },
+  {
+    id:'citus', label:'Citus Coordinator', sublabel:'PostgreSQL · Puerto 5432',
+    emoji:'🐘', color:'#a78bfa', glow:'#6d28d9', bg:'#1a0a2e',
+    tech:['PostgreSQL 14','Citus 11','uuid-ossp'],
+    desc:'Coordinador de base de datos distribuida. Almacena los 57 campos de la Res. 866/2021. Distribuye datos por documento_id.',
+    shape:'diamond',
+  },
+  {
+    id:'etcd', label:'etcd', sublabel:'Consenso Raft · Puerto 2379',
+    emoji:'⚙️', color:'#ef4444', glow:'#b91c1c', bg:'#1c0a0a',
+    tech:['etcd v3.5.0','Raft Consensus','gRPC'],
+    desc:'Servicio de coordinación distribuida. Almacena el estado del clúster, líderes y configuración de nodos usando el protocolo Raft.',
+    shape:'circle',
+  },
+];
+
+// ── CONNECTIONS ──
+const CONNECTIONS = [
+  { from:'frontend',  to:'guajira',  label:'REST/HTTPS', color:'#3b82f6', bidirectional:true },
+  { from:'frontend',  to:'amazonas', label:'REST/HTTPS', color:'#3b82f6', bidirectional:true },
+  { from:'frontend',  to:'guainia',  label:'REST/HTTPS', color:'#3b82f6', bidirectional:true },
+  { from:'frontend',  to:'narino',   label:'REST/HTTPS', color:'#3b82f6', bidirectional:true },
+  { from:'guajira',   to:'citus',    label:'SQL/TCP',    color:'#a78bfa', bidirectional:true },
+  { from:'amazonas',  to:'citus',    label:'SQL/TCP',    color:'#a78bfa', bidirectional:true },
+  { from:'guainia',   to:'citus',    label:'SQL/TCP',    color:'#a78bfa', bidirectional:true },
+  { from:'narino',    to:'citus',    label:'SQL/TCP',    color:'#a78bfa', bidirectional:true },
+  { from:'guajira',   to:'etcd',     label:'gRPC',       color:'#ef4444', bidirectional:false },
+  { from:'amazonas',  to:'etcd',     label:'gRPC',       color:'#ef4444', bidirectional:false },
+  { from:'guainia',   to:'etcd',     label:'gRPC',       color:'#ef4444', bidirectional:false },
+  { from:'narino',    to:'etcd',     label:'gRPC',       color:'#ef4444', bidirectional:false },
+  { from:'guajira',   to:'amazonas', label:'CouchDB Sync',color:'#22c55e',bidirectional:true },
+  { from:'amazonas',  to:'guainia',  label:'CouchDB Sync',color:'#22c55e',bidirectional:true },
+  { from:'guainia',   to:'narino',   label:'CouchDB Sync',color:'#22c55e',bidirectional:true },
+  { from:'narino',    to:'guajira',  label:'CouchDB Sync',color:'#22c55e',bidirectional:true },
+];
+
+// ── PACKETS (animated) ──
+const PACKETS = CONNECTIONS.map((c, i) => ({
+  conn: c,
+  t: Math.random(),
+  speed: 0.003 + Math.random() * 0.003,
+  size: 3 + Math.random() * 2,
+}));
+
+// ── POSITION computation ──
+function updatePositions() {
+  const cx = W / 2, cy = H / 2;
+  const hexR = Math.min(W, H) * 0.28;
+  const angle0 = -Math.PI / 2;
+  const hexAngles = [angle0, angle0 + Math.PI*2/4, angle0 + Math.PI, angle0 + 3*Math.PI*2/4];
+
+  // 4 geo nodes in a diamond pattern
+  const hexNodes = ['guajira', 'amazonas', 'guainia', 'narino'];
+  hexNodes.forEach((id, i) => {
+    const n = NODES.find(n => n.id === id);
+    n.x = cx + Math.cos(hexAngles[i]) * hexR;
+    n.y = cy + Math.sin(hexAngles[i]) * hexR;
+    n.r = 52;
+  });
+
+  // Frontend top center
+  const fn = NODES.find(n => n.id === 'frontend');
+  fn.x = cx;
+  fn.y = cy - hexR - 100;
+  fn.w = 160; fn.h = 60; fn.r = 60;
+
+  // Citus below
+  const cn = NODES.find(n => n.id === 'citus');
+  cn.x = cx;
+  cn.y = cy + hexR + 95;
+  cn.r = 58;
+
+  // etcd top right
+  const en = NODES.find(n => n.id === 'etcd');
+  en.x = cx + hexR + 100;
+  en.y = cy - hexR * 0.3;
+  en.r = 42;
+}
+
+// ── NODE POSITION ──
+function nodePos(id) {
+  const n = NODES.find(n => n.id === id);
+  return n ? { x: n.x, y: n.y } : { x: 0, y: 0 };
+}
+
+// ── DRAW CONNECTION ──
+function drawConnection(conn) {
+  const from = NODES.find(n => n.id === conn.from);
+  const to   = NODES.find(n => n.id === conn.to);
+  if (!from || !to) return;
+
+  ctx.save();
+  ctx.strokeStyle = conn.color + '55';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([6, 5]);
+  ctx.beginPath();
+  ctx.moveTo(from.x, from.y);
+  // gentle curve
+  const mx = (from.x + to.x) / 2, my = (from.y + to.y) / 2;
+  const dx = to.y - from.y, dy = -(to.x - from.x);
+  const len = Math.sqrt(dx*dx + dy*dy) || 1;
+  const cx2 = mx + (dx/len)*20, cy2 = my + (dy/len)*20;
+  ctx.quadraticCurveTo(cx2, cy2, to.x, to.y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+
+  // Labels
+  if (labelsEnabled) {
+    ctx.save();
+    ctx.fillStyle = conn.color + 'cc';
+    ctx.font = '500 9px Inter';
+    ctx.textAlign = 'center';
+    ctx.fillText(conn.label, (from.x + to.x) / 2, (from.y + to.y) / 2 - 6);
+    ctx.restore();
+  }
+}
+
+// ── DRAW PACKET ──
+function drawPacket(pkt) {
+  const from = NODES.find(n => n.id === pkt.conn.from);
+  const to   = NODES.find(n => n.id === pkt.conn.to);
+  if (!from || !to) return;
+
+  const t = pkt.t;
+  const mx = (from.x + to.x) / 2, my = (from.y + to.y) / 2;
+  const dx = to.y - from.y, dy = -(to.x - from.x);
+  const len = Math.sqrt(dx*dx + dy*dy) || 1;
+  const cx2 = mx + (dx/len)*20, cy2 = my + (dy/len)*20;
+
+  // Quadratic bezier point
+  const px = (1-t)*(1-t)*from.x + 2*(1-t)*t*cx2 + t*t*to.x;
+  const py = (1-t)*(1-t)*from.y + 2*(1-t)*t*cy2 + t*t*to.y;
+
+  ctx.save();
+  ctx.shadowColor = pkt.conn.color;
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = pkt.conn.color;
+  ctx.beginPath();
+  ctx.arc(px, py, pkt.size, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// ── HEXAGON ──
+function drawHex(x, y, r, n) {
+  const isHov = hoveredNode === n.id;
+  ctx.save();
+
+  // Outer glow
+  if (isHov || true) {
+    const glowR = isHov ? r * 1.5 : r * 1.2;
+    const grad = ctx.createRadialGradient(x, y, r*0.3, x, y, glowR);
+    grad.addColorStop(0, n.color + '30');
+    grad.addColorStop(1, 'transparent');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(x, y, glowR, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // Hex body
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = (i * Math.PI / 3) - Math.PI / 6;
+    const px = x + r * Math.cos(a), py = y + r * Math.sin(a);
+    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  const grad = ctx.createRadialGradient(x-r*0.2, y-r*0.2, 0, x, y, r);
+  grad.addColorStop(0, n.bg.replace('#','#'+'11'+'').slice(0,7) + 'ff');
+  grad.addColorStop(1, n.bg);
+
+  ctx.fillStyle = n.bg;
+  ctx.fill();
+  ctx.strokeStyle = isHov ? n.color : n.glow;
+  ctx.lineWidth = isHov ? 2.5 : 1.5;
+  ctx.shadowColor = n.color;
+  ctx.shadowBlur = isHov ? 20 : 8;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Emoji
+  ctx.font = `${r * 0.6}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(n.emoji, x, y - 8);
+
+  // Label
+  ctx.fillStyle = n.color;
+  ctx.font = 'bold 10px Inter';
+  ctx.fillText(n.label.split(' ').slice(-1)[0] || n.label, x, y + r*0.5 - 2);
+  // Port
+  ctx.fillStyle = '#64748b';
+  ctx.font = '8px JetBrains Mono';
+  ctx.fillText(n.sublabel.split('·')[1]?.trim() || '', x, y + r*0.5 + 11);
+
+  ctx.textBaseline = 'alphabetic';
+  ctx.restore();
+}
+
+// ── DRAW CIRCLE (etcd) ──
+function drawCircle(x, y, r, n) {
+  const isHov = hoveredNode === n.id;
+  ctx.save();
+  // glow
+  const grad = ctx.createRadialGradient(x, y, r*0.3, x, y, r*1.5);
+  grad.addColorStop(0, n.color + '25');
+  grad.addColorStop(1, 'transparent');
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.arc(x, y, r*1.5, 0, Math.PI*2); ctx.fill();
+
+  // body
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2);
+  ctx.fillStyle = n.bg; ctx.fill();
+  ctx.strokeStyle = isHov ? n.color : n.glow;
+  ctx.lineWidth = isHov ? 2.5 : 1.5;
+  ctx.shadowColor = n.color; ctx.shadowBlur = isHov ? 20 : 8;
+  ctx.stroke(); ctx.shadowBlur = 0;
+
+  // content
+  ctx.font = `${r*0.6}px sans-serif`;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(n.emoji, x, y-6);
+  ctx.fillStyle = n.color; ctx.font='bold 9px Inter';
+  ctx.fillText('etcd', x, y + r*0.45);
+  ctx.textBaseline='alphabetic';
+  ctx.restore();
+}
+
+// ── DRAW DIAMOND (Citus) ──
+function drawDiamond(x, y, r, n) {
+  const isHov = hoveredNode === n.id;
+  ctx.save();
+  // glow
+  const gGrad = ctx.createRadialGradient(x, y, r*0.3, x, y, r*1.8);
+  gGrad.addColorStop(0, n.color+'30'); gGrad.addColorStop(1,'transparent');
+  ctx.fillStyle = gGrad;
+  ctx.beginPath(); ctx.arc(x,y,r*1.8,0,Math.PI*2); ctx.fill();
+
+  // diamond
+  ctx.beginPath();
+  ctx.moveTo(x, y-r); ctx.lineTo(x+r*0.75, y); ctx.lineTo(x, y+r); ctx.lineTo(x-r*0.75, y);
+  ctx.closePath();
+  ctx.fillStyle = n.bg; ctx.fill();
+  ctx.strokeStyle = isHov ? n.color : n.glow;
+  ctx.lineWidth = isHov ? 2.5 : 1.5;
+  ctx.shadowColor = n.color; ctx.shadowBlur = isHov ? 22 : 10;
+  ctx.stroke(); ctx.shadowBlur = 0;
+
+  // content
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.font = `${r*0.45}px sans-serif`; ctx.fillText(n.emoji, x, y-r*0.2);
+  ctx.fillStyle = n.color; ctx.font='bold 9px Inter';
+  ctx.fillText('Citus', x, y+r*0.3);
+  ctx.fillStyle='#64748b'; ctx.font='7px JetBrains Mono';
+  ctx.fillText(':5432', x, y+r*0.55);
+  ctx.textBaseline='alphabetic';
+  ctx.restore();
+}
+
+// ── DRAW RECT (Frontend) ──
+function drawRect(x, y, w, h, n) {
+  const isHov = hoveredNode === n.id;
+  const r = 14;
+  ctx.save();
+
+  // glow
+  ctx.shadowColor = n.color; ctx.shadowBlur = isHov ? 28 : 14;
+
+  // body
+  ctx.beginPath();
+  ctx.roundRect(x-w/2, y-h/2, w, h, r);
+  ctx.fillStyle = n.bg; ctx.fill();
+  ctx.strokeStyle = isHov ? n.color : n.glow;
+  ctx.lineWidth = isHov ? 2.5 : 1.5;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // content
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.font='1rem sans-serif'; ctx.fillText(n.emoji, x - 40, y);
+  ctx.fillStyle = n.color; ctx.font='bold 11px Inter';
+  ctx.fillText('Frontend React', x+8, y - 7);
+  ctx.fillStyle='#64748b'; ctx.font='8px JetBrains Mono';
+  ctx.fillText('localhost:3000', x+8, y + 9);
+  ctx.textBaseline='alphabetic';
+  ctx.restore();
+}
+
+// ── DRAW NODE ──
+function drawNode(n) {
+  if (!n.x) return;
+  if (n.shape === 'hex') drawHex(n.x, n.y, n.r, n);
+  else if (n.shape === 'circle') drawCircle(n.x, n.y, n.r, n);
+  else if (n.shape === 'diamond') drawDiamond(n.x, n.y, n.r, n);
+  else if (n.shape === 'rect') drawRect(n.x, n.y, n.w || 160, n.h || 60, n);
+}
+
+// ── NODE LABEL (outside) ──
+function drawNodeLabel(n) {
+  if (!n.x) return;
+  let ly = n.y + n.r + 18;
+  if (n.shape === 'diamond') ly = n.y + n.r + 22;
+  if (n.shape === 'rect') return; // drawn inside
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = n.color;
+  ctx.font = 'bold 11px Inter';
+  ctx.fillText(n.label, n.x, ly);
+  ctx.fillStyle = '#475569';
+  ctx.font = '9px JetBrains Mono';
+  ctx.fillText(n.sublabel, n.x, ly + 13);
+  ctx.restore();
+}
+
+// ── HIT TEST ──
+function hitNode(x, y) {
+  for (const n of NODES) {
+    if (!n.x) continue;
+    if (n.shape === 'rect') {
+      if (x >= n.x - (n.w||160)/2 && x <= n.x + (n.w||160)/2 &&
+          y >= n.y - (n.h||60)/2  && y <= n.y + (n.h||60)/2) return n;
+    } else {
+      const dx = x - n.x, dy = y - n.y;
+      if (Math.sqrt(dx*dx + dy*dy) <= n.r + 8) return n;
+    }
+  }
+  return null;
+}
+
+// ── MAIN DRAW LOOP ──
+let animId;
+function loop() {
+  ctx.clearRect(0, 0, W, H);
+  ctx.save();
+  ctx.translate(tx + W/2, ty + H/2);
+  ctx.scale(scale, scale);
+  ctx.translate(-W/2, -H/2);
+
+  // Connections
+  CONNECTIONS.forEach(drawConnection);
+
+  // Packets
+  if (animEnabled) {
+    PACKETS.forEach(pkt => {
+      drawPacket(pkt);
+      pkt.t = (pkt.t + pkt.speed) % 1;
+    });
+  }
+
+  // Nodes
+  NODES.forEach(drawNode);
+  NODES.forEach(drawNodeLabel);
+
+  ctx.restore();
+  time++;
+  animId = requestAnimationFrame(loop);
+}
+
+// ── RESIZE ──
+function resize() {
+  W = canvas.width  = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  updatePositions();
+}
+
+// ── MOUSE EVENTS ──
+const tooltip   = document.getElementById('tooltip');
+const tipName   = document.getElementById('tip-name');
+const tipTech   = document.getElementById('tip-tech');
+
+canvas.addEventListener('mousemove', e => {
+  if (dragging) {
+    tx += e.movementX; ty += e.movementY; return;
+  }
+  const wx = (e.clientX - tx - W/2) / scale + W/2;
+  const wy = (e.clientY - ty - H/2) / scale + H/2;
+  const hit = hitNode(wx, wy);
+  hoveredNode = hit ? hit.id : null;
+
+  if (hit) {
+    tipName.textContent  = hit.label;
+    tipName.style.color  = hit.color;
+    tipTech.innerHTML    = `<b>${hit.sublabel}</b><br>${hit.desc}<br><br>
+      <span style="color:#94a3b8">🛠 ${hit.tech.join(' · ')}</span>`;
+    tooltip.style.left   = (e.clientX + 16) + 'px';
+    tooltip.style.top    = Math.min(e.clientY - 10, H - 160) + 'px';
+    tooltip.classList.add('show');
+    canvas.style.cursor  = 'pointer';
+  } else {
+    tooltip.classList.remove('show');
+    canvas.style.cursor  = 'grab';
+  }
+});
+
+canvas.addEventListener('mouseleave', () => {
+  tooltip.classList.remove('show');
+  hoveredNode = null;
+});
+canvas.addEventListener('mousedown', () => { dragging = true; canvas.style.cursor='grabbing'; });
+window.addEventListener('mouseup',   () => { dragging = false; canvas.style.cursor='grab'; });
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? 0.9 : 1.1;
+  scale = Math.max(0.3, Math.min(4, scale * delta));
+}, { passive:false });
+
+// ── CONTROLS ──
+document.getElementById('btn-anim').addEventListener('click', function(){
+  animEnabled = !animEnabled;
+  this.classList.toggle('active', animEnabled);
+  this.textContent = animEnabled ? '⚡ Animaciones' : '⏸ Pausado';
+});
+
+document.getElementById('btn-labels').addEventListener('click', function(){
+  labelsEnabled = !labelsEnabled;
+  this.classList.toggle('active', labelsEnabled);
+});
+
+document.getElementById('btn-theme').addEventListener('click', function(){
+  lightMode = !lightMode;
+  document.body.style.background = lightMode ? '#f8fafc' : '';
+  this.textContent = lightMode ? '☀️ Modo Aula' : '🌙 Modo Aula';
+  this.classList.toggle('active', lightMode);
+});
+
+// ── INIT ──
+resize();
+window.addEventListener('resize', resize);
+loop();
+</script>
+</body>
+</html>

@@ -1,0 +1,135 @@
+{
+  "info": {
+    "name": "RED SALUD DISTRIBUIDA — FHIR API",
+    "_postman_id": "red-salud-fhir-2026",
+    "description": "Colección de peticiones FHIR R4 para la Red de Salud Distribuida P2P.\nCubre Patient, Encounter, Observation, Condition, MedicationRequest en 3 nodos.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {"key": "nodo1", "value": "http://localhost:5000"},
+    {"key": "nodo2", "value": "http://localhost:5001"},
+    {"key": "nodo3", "value": "http://localhost:5002"},
+    {"key": "hapi1", "value": "http://localhost:8080/fhir"},
+    {"key": "hapi2", "value": "http://localhost:8081/fhir"},
+    {"key": "hapi3", "value": "http://localhost:8082/fhir"},
+    {"key": "token", "value": ""}
+  ],
+  "item": [
+    {
+      "name": "01 — OAuth2 Token",
+      "item": [
+        {
+          "name": "Obtener JWT Token (Nodo 1)",
+          "request": {
+            "method": "POST",
+            "url": "{{nodo1}}/auth/token",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"grant_type\":\"client_credentials\",\"client_id\":\"postman-test\",\"scope\":\"patient/*.read patient/*.write\"}"}
+          },
+          "event": [{"listen": "test", "script": {"exec": ["var data = pm.response.json();","pm.collectionVariables.set('token', data.access_token);","pm.test('Token recibido', () => pm.expect(data.access_token).to.be.a('string'));"]}}]
+        }
+      ]
+    },
+    {
+      "name": "02 — HAPI FHIR Metadata",
+      "item": [
+        {"name": "CapabilityStatement HAPI Guajira", "request": {"method": "GET", "url": "{{hapi1}}/metadata"}},
+        {"name": "CapabilityStatement HAPI Amazonas", "request": {"method": "GET", "url": "{{hapi2}}/metadata"}},
+        {"name": "CapabilityStatement HAPI Guainía", "request": {"method": "GET", "url": "{{hapi3}}/metadata"}}
+      ]
+    },
+    {
+      "name": "03 — Patient CRUD",
+      "item": [
+        {
+          "name": "POST Patient (Nodo 1 via API)",
+          "request": {
+            "method": "POST",
+            "url": "{{nodo1}}/hapi/Patient",
+            "header": [{"key": "Content-Type", "value": "application/fhir+json"},{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "body": {"mode": "raw", "raw": "{\"resourceType\":\"Patient\",\"identifier\":[{\"system\":\"http://redsalud.co/documento\",\"value\":\"9999999\"}],\"name\":[{\"text\":\"Juan Pérez López\",\"family\":\"López\",\"given\":[\"Juan\",\"Pérez\"]}],\"gender\":\"male\",\"birthDate\":\"1990-05-12\"}"}
+          }
+        },
+        {"name": "GET Patient Search (HAPI 1)", "request": {"method": "GET", "url": "{{hapi1}}/Patient"}},
+        {"name": "GET Patient Search (HAPI 2)", "request": {"method": "GET", "url": "{{hapi2}}/Patient"}},
+        {"name": "GET Patient Search (HAPI 3)", "request": {"method": "GET", "url": "{{hapi3}}/Patient"}}
+      ]
+    },
+    {
+      "name": "04 — Encounter",
+      "item": [
+        {
+          "name": "POST Encounter (Nodo 1)",
+          "request": {
+            "method": "POST",
+            "url": "{{nodo1}}/hapi/Encounter",
+            "header": [{"key": "Content-Type", "value": "application/fhir+json"},{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "body": {"mode": "raw", "raw": "{\"resourceType\":\"Encounter\",\"status\":\"in-progress\",\"class\":{\"system\":\"http://terminology.hl7.org/CodeSystem/v3-ActCode\",\"code\":\"AMB\"},\"subject\":{\"reference\":\"Patient?identifier=9999999\"},\"period\":{\"start\":\"2026-05-20T10:00:00\"}}"}
+          }
+        },
+        {"name": "GET Encounter Search (HAPI 1)", "request": {"method": "GET", "url": "{{hapi1}}/Encounter"}}
+      ]
+    },
+    {
+      "name": "05 — Observation",
+      "item": [
+        {
+          "name": "POST Observation Triage (Nodo 1)",
+          "request": {
+            "method": "POST",
+            "url": "{{nodo1}}/hapi/Observation",
+            "header": [{"key": "Content-Type", "value": "application/fhir+json"},{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "body": {"mode": "raw", "raw": "{\"resourceType\":\"Observation\",\"status\":\"final\",\"code\":{\"coding\":[{\"system\":\"http://loinc.org\",\"code\":\"56839-4\",\"display\":\"Triage note\"}]},\"subject\":{\"reference\":\"Patient?identifier=9999999\"},\"valueString\":\"Triage Manchester nivel III\"}"}
+          }
+        },
+        {"name": "GET Observation Search (HAPI 1)", "request": {"method": "GET", "url": "{{hapi1}}/Observation"}}
+      ]
+    },
+    {
+      "name": "06 — Condition",
+      "item": [
+        {
+          "name": "POST Condition Diagnóstico (Nodo 1)",
+          "request": {
+            "method": "POST",
+            "url": "{{nodo1}}/hapi/Condition",
+            "header": [{"key": "Content-Type", "value": "application/fhir+json"},{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "body": {"mode": "raw", "raw": "{\"resourceType\":\"Condition\",\"clinicalStatus\":{\"coding\":[{\"system\":\"http://terminology.hl7.org/CodeSystem/condition-clinical\",\"code\":\"active\"}]},\"code\":{\"coding\":[{\"system\":\"http://hl7.org/fhir/sid/icd-10\",\"code\":\"I10\",\"display\":\"Hipertensión esencial\"}]},\"subject\":{\"reference\":\"Patient?identifier=9999999\"}}"}
+          }
+        },
+        {"name": "GET Condition Search (HAPI 1)", "request": {"method": "GET", "url": "{{hapi1}}/Condition"}}
+      ]
+    },
+    {
+      "name": "07 — MedicationRequest",
+      "item": [
+        {
+          "name": "POST MedicationRequest (Nodo 1)",
+          "request": {
+            "method": "POST",
+            "url": "{{nodo1}}/hapi/MedicationRequest",
+            "header": [{"key": "Content-Type", "value": "application/fhir+json"},{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "body": {"mode": "raw", "raw": "{\"resourceType\":\"MedicationRequest\",\"status\":\"active\",\"intent\":\"order\",\"subject\":{\"reference\":\"Patient?identifier=9999999\"},\"medicationCodeableConcept\":{\"text\":\"Enalapril 20mg\"},\"dosageInstruction\":[{\"text\":\"20mg oral cada 12 horas\"}]}"}
+          }
+        },
+        {"name": "GET MedicationRequest Search (HAPI 1)", "request": {"method": "GET", "url": "{{hapi1}}/MedicationRequest"}}
+      ]
+    },
+    {
+      "name": "08 — HC Consolidada y Reportes",
+      "item": [
+        {"name": "GET HC Completa (Paciente 1001001001)", "request": {"method": "GET", "url": "{{nodo1}}/hc/completa/1001001001"}},
+        {"name": "GET Reportes/Métricas", "request": {"method": "GET", "url": "{{nodo1}}/reportes/metricas"}},
+        {"name": "GET Health Full", "request": {"method": "GET", "url": "{{nodo1}}/health/full"}}
+      ]
+    },
+    {
+      "name": "09 — Búsqueda Federada P2P",
+      "item": [
+        {"name": "Buscar en Nodo 1", "request": {"method": "GET", "url": "{{nodo1}}/recepcion/buscar/1001001001"}},
+        {"name": "Buscar en Nodo 2", "request": {"method": "GET", "url": "{{nodo2}}/recepcion/buscar/1001001001"}},
+        {"name": "Buscar en Nodo 3", "request": {"method": "GET", "url": "{{nodo3}}/recepcion/buscar/1001001001"}}
+      ]
+    }
+  ]
+}

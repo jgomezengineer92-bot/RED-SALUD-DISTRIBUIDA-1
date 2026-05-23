@@ -1,0 +1,289 @@
+version: '3.8'
+
+services:
+  # ==============================
+  # INFRAESTRUCTURA DISTRIBUIDA (Citus & etcd)
+  # ==============================
+  citus-coordinator:
+    image: citusdata/citus:latest
+    container_name: citus-coordinator
+    environment:
+      - POSTGRES_USER=myuser
+      - POSTGRES_PASSWORD=mypass
+      - POSTGRES_DB=clinic
+    ports:
+      - "5432:5432"
+    volumes:
+      - citus_data:/var/lib/postgresql
+      - ./sql/schema_citus_full.sql:/docker-entrypoint-initdb.d/01_schema.sql
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myuser -d clinic"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  etcd-0.etcd:
+    image: quay.io/coreos/etcd:v3.5.0
+    container_name: etcd-0
+    command:
+      - /usr/local/bin/etcd
+      - --name=etcd-0
+      - --data-dir=/etcd-data
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://etcd-0.etcd:2379
+      - --initial-advertise-peer-urls=http://etcd-0.etcd:2380
+      - --initial-cluster=etcd-0=http://etcd-0.etcd:2380
+      - --initial-cluster-token=etcd-cluster
+      - --initial-cluster-state=new
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    restart: always
+
+  # ==============================
+  # HAPI FHIR R4 — 3 INSTANCIAS (1 por nodo principal)
+  # Requisito 3.1: Servidor HAPI FHIR Operativo
+  # ==============================
+  hapi-fhir-guajira:
+    image: hapiproject/hapi:latest
+    container_name: hapi-fhir-guajira
+    ports: ["8080:8080"]
+    environment:
+      - hapi.fhir.server_address=http://hapi-fhir-guajira:8080/fhir
+      - hapi.fhir.fhir_version=R4
+      - hapi.fhir.allow_multiple_delete=true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/fhir/metadata || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  hapi-fhir-amazonas:
+    image: hapiproject/hapi:latest
+    container_name: hapi-fhir-amazonas
+    ports: ["8081:8080"]
+    environment:
+      - hapi.fhir.server_address=http://hapi-fhir-amazonas:8080/fhir
+      - hapi.fhir.fhir_version=R4
+      - hapi.fhir.allow_multiple_delete=true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/fhir/metadata || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  hapi-fhir-guainia:
+    image: hapiproject/hapi:latest
+    container_name: hapi-fhir-guainia
+    ports: ["8082:8080"]
+    environment:
+      - hapi.fhir.server_address=http://hapi-fhir-guainia:8080/fhir
+      - hapi.fhir.fhir_version=R4
+      - hapi.fhir.allow_multiple_delete=true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/fhir/metadata || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ==============================
+  # OBSERVABILIDAD: Prometheus + Grafana
+  # Requisito 5.3: Logs y Monitoreo
+  # ==============================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports: ["9090:9090"]
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports: ["3001:3000"]
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  # ==============================
+  # NODO 1: LA GUAJIRA
+  # ==============================
+  guajira_db:
+    image: couchdb:latest
+    container_name: guajira_db
+    ports: ["5984:5984"]
+    environment: 
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=admin
+    volumes: ["./couchdata/guajira:/opt/couchdb/data"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5984/_up"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  guajira_api:
+    build: ./backend
+    container_name: guajira_api
+    ports: ["5000:5000"]
+    depends_on:
+      guajira_db:
+        condition: service_healthy
+    environment:
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=admin
+      - COUCHDB_HOST=guajira_db
+      - COUCHDB_PORT=5984
+      - NODO_NAME=La Guajira
+      - HAPI_FHIR_URL=http://hapi-fhir-guajira:8080/fhir
+      - JWT_SECRET=red-salud-distribuida-secret-2026
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5000/_up')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==============================
+  # NODO 2: AMAZONAS
+  # ==============================
+  amazonas_db:
+    image: couchdb:latest
+    container_name: amazonas_db
+    ports: ["5985:5984"]
+    environment: 
+      - COUCHDB_USER=admin123
+      - COUCHDB_PASSWORD=admin123
+    volumes: ["./couchdata/amazonas:/opt/couchdb/data"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5984/_up"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  amazonas_api:
+    build: ./backend
+    container_name: amazonas_api
+    ports: ["5001:5000"]
+    depends_on:
+      amazonas_db:
+        condition: service_healthy
+    environment:
+      - COUCHDB_USER=admin123
+      - COUCHDB_PASSWORD=admin123
+      - COUCHDB_HOST=amazonas_db
+      - COUCHDB_PORT=5984
+      - NODO_NAME=Amazonas
+      - HAPI_FHIR_URL=http://hapi-fhir-amazonas:8080/fhir
+      - JWT_SECRET=red-salud-distribuida-secret-2026
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5000/_up')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==============================
+  # NODO 3: GUAINÍA
+  # ==============================
+  guainia_db:
+    image: couchdb:latest
+    container_name: guainia_db
+    ports: ["5986:5984"]
+    environment: 
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=admin
+    volumes: ["./couchdata/guainia:/opt/couchdb/data"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5984/_up"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  guainia_api:
+    build: ./backend
+    container_name: guainia_api
+    ports: ["5002:5000"]
+    depends_on:
+      guainia_db:
+        condition: service_healthy
+    environment:
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=admin
+      - COUCHDB_HOST=guainia_db
+      - COUCHDB_PORT=5984
+      - NODO_NAME=Guainía
+      - HAPI_FHIR_URL=http://hapi-fhir-guainia:8080/fhir
+      - JWT_SECRET=red-salud-distribuida-secret-2026
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5000/_up')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==============================
+  # NODO 4: NARIÑO
+  # ==============================
+  narino_db:
+    image: couchdb:latest
+    container_name: narino_db
+    ports: ["5987:5984"]
+    environment: 
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=admin
+    volumes: ["./couchdata/narino:/opt/couchdb/data"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5984/_up"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  narino_api:
+    build: ./backend
+    container_name: narino_api
+    ports: ["5003:5000"]
+    depends_on:
+      narino_db:
+        condition: service_healthy
+    environment:
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=admin
+      - COUCHDB_HOST=narino_db
+      - COUCHDB_PORT=5984
+      - NODO_NAME=Nariño
+      - HAPI_FHIR_URL=http://hapi-fhir-guainia:8080/fhir
+      - JWT_SECRET=red-salud-distribuida-secret-2026
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5000/_up')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  citus_data:
+
+networks:
+  default:
+    name: red_p2p_salud

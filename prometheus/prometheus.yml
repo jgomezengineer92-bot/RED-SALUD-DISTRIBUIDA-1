@@ -1,0 +1,51 @@
+# =====================================================================
+# RED SALUD DISTRIBUIDA — Prometheus Configuration
+# Requisito 5.3: Stack de observabilidad
+# =====================================================================
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Flask API Nodes (métricas via prometheus_flask_exporter)
+  - job_name: 'flask-apis'
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - 'guajira_api:5000'
+          - 'amazonas_api:5000'
+          - 'guainia_api:5000'
+          - 'narino_api:5000'
+        labels:
+          service: 'api-clinica'
+
+  # HAPI FHIR Servers
+  - job_name: 'hapi-fhir'
+    metrics_path: /fhir/$metrics
+    static_configs:
+      - targets:
+          - 'hapi-fhir-guajira:8080'
+          - 'hapi-fhir-amazonas:8080'
+          - 'hapi-fhir-guainia:8080'
+        labels:
+          service: 'hapi-fhir'
+
+  # CouchDB Nodes (health endpoint)
+  - job_name: 'couchdb'
+    metrics_path: /_node/_local/_stats/couchdb
+    static_configs:
+      - targets:
+          - 'guajira_db:5984'
+          - 'amazonas_db:5984'
+          - 'guainia_db:5984'
+          - 'narino_db:5984'
+        labels:
+          service: 'couchdb'
+    basic_auth:
+      username: admin
+      password: admin
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

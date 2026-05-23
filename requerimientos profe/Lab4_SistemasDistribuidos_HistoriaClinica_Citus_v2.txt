@@ -1,0 +1,451 @@
+﻿
+
+🏥
+LABORATORIO 5
+Historia Clínica Distribuida
+con PostgreSQL + Citus
+Sistemas Distribuidos  ·  Bases de Datos Distribuidas en Contenedores Docker
+
+Docente
+Jaider Enrique Reyes Herazo
+Programa
+Ingeniería de Sistemas
+Institución
+UAJS 
+Repositorio
+github.com/jaiderreyes/historia_clinica_distribuida_citus
+Tecnologías
+Docker · PostgreSQL 15 · Citus 12 · psql
+Duración estimada
+120 - 150 minutos
+Modalidad
+Individual - evaluado en escala 0.0 a 5.0
+
+
+0. Resultados de Aprendizaje
+Este laboratorio está diseñado para que el estudiante alcance los siguientes Resultados de Aprendizaje (RA) de la asignatura Sistemas Distribuidos. Cada actividad contribuye directamente a uno o más RA, y la evaluación final integra todos ellos en una nota única en escala de 0.0 a 5.0.
+
+ID
+Resultado de Aprendizaje
+Descripción
+RA1
+Despliegue de infraestructura distribuida
+Implementa un clúster de base de datos distribuida usando Docker Compose con PostgreSQL + Citus, configurando correctamente coordinador y workers.
+RA2
+Distribución y replicación de datos
+Diferencia y aplica estrategias de distribución (sharding) y replicación de tablas según su naturaleza y patrones de acceso, usando document_id como clave de distribución.
+RA3
+Transparencia de distribución
+Verifica empíricamente que el sistema distribuido se comporta de forma transparente para el cliente, ejecutando consultas SQL estándar sobre el coordinador sin conocer la ubicación física de los datos.
+RA4
+Análisis de ejecución distribuida
+Interpreta planes de ejecución distribuidos (EXPLAIN) e identifica conceptos como query pushdown, task count, y colocation en el contexto del sistema implementado.
+RA5
+Tolerancia a fallos y diagnóstico
+Simula, diagnostica y recupera un escenario de fallo de nodo, interpretando los estados de shards en pg_dist_shard_placement y relacionándolos con los principios de disponibilidad del Teorema CAP.
+RA6
+Pensamiento crítico y argumentación técnica
+Argumenta decisiones de diseño en sistemas distribuidos (elección de clave de distribución, tipo de tabla, factor de replicación) con base en principios teóricos de la asignatura.
+
+📌 Todos los RA tienen el mismo peso en la evaluación. No existen actividades opcionales: completar el laboratorio de principio a fin es la única forma de obtener la nota máxima (5.0).
+
+1. Objetivos del Laboratorio
+Al finalizar este laboratorio el estudiante estará en capacidad de:
+• Desplegar un clúster de base de datos distribuida real usando Docker Compose con PostgreSQL + Citus.
+• Comprender la diferencia entre tablas distribuidas (sharded) y tablas de referencia (replicadas).
+• Verificar los principios de Transparencia, Particionamiento y Autonomía Local en un sistema distribuido real.
+• Ejecutar consultas SQL distribuidas observando cómo Citus las enruta entre nodos.
+• Analizar planes de ejecución distribuidos con EXPLAIN y relacionarlos con la teoría de sistemas distribuidos.
+• Simular, diagnosticar y recuperar un escenario de fallo de nodo, interpretando el comportamiento del sistema distribuido.
+
+2. Marco Teórico
+Un Sistema de Bases de Datos Distribuido (SBDD) es una colección de bases de datos lógicamente relacionadas y físicamente distribuidas en múltiples nodos interconectados, que se perciben como un único sistema desde el exterior. Este laboratorio implementa los principios fundamentales de los SBDD:
+
+Concepto
+Descripción
+Transparencia de Distribución
+El coordinador oculta la complejidad: el cliente usa SQL estándar sin saber que los datos están fragmentados en múltiples nodos.
+Particionamiento (Sharding)
+Citus divide las filas por hash de documento_id en shards (por defecto 32). Cada shard vive en un worker diferente.
+Replicación de Referencia
+profesional_salud existe como copia completa en todos los nodos, permitiendo JOINs locales eficientes desde cualquier worker.
+Autonomía Local
+Cada worker procesa sus shards de forma autónoma; el coordinador solo orquesta, no almacena datos de usuario.
+Colocation
+Filas de usuario, atencion y diagnostico con el mismo documento_id se ubican en el mismo shard → JOINs sin tráfico de red.
+Query Pushdown
+El coordinador envía porciones de la consulta directamente a los workers relevantes y combina resultados.
+Tolerancia a Fallos
+Cuando un worker cae, el coordinador detecta el fallo y gestiona la disponibilidad según el factor de replicación configurado.
+
+2.1  ¿Qué es Citus?
+Citus es una extensión de código abierto para PostgreSQL que transforma una instancia estándar en un clúster de base de datos distribuido bajo el paradigma Coordinator-Worker:
+• El Coordinador recibe todas las consultas SQL del cliente, las analiza y las descompone en sub-consultas dirigidas a los workers correctos.
+• Los Workers almacenan los shards (fragmentos físicos) de las tablas distribuidas y ejecutan las sub-consultas de forma paralela.
+• El cliente siempre conecta solo al coordinador, sin necesidad de conocer la existencia de los workers (transparencia).
+
+2.2  Tolerancia a Fallos en Citus
+Cuando un worker falla, el comportamiento del clúster depende del factor de replicación configurado:
+• Sin replicación (factor=1, por defecto): las consultas que requieran shards del worker caído retornarán error parcial. El coordinador detecta el fallo y marca los placements como inactivos.
+• Con replicación (factor=2): cada shard tiene una copia en otro worker. Al caer un nodo, el coordinador enruta automáticamente al worker que tiene la copia, y el servicio continúa sin interrupción.
+• El catálogo pg_dist_shard_placement registra el estado de cada shard (shardstate=1 activo, shardstate=3 inactivo) y permite diagnosticar el impacto exacto de un fallo.
+
+2.3  Relación con el Dominio de Salud
+El modelo de Historia Clínica Distribuida implementado refleja casos reales de interoperabilidad en salud (HL7 FHIR, RIPS Colombia). Cada paciente se identifica por documento_id, que actúa como clave de distribución garantizando que todos sus registros (atenciones, diagnósticos, egresos) se ubiquen en el mismo shard - propiedad llamada colocation - lo que optimiza drásticamente las consultas JOIN.
+
+3. Arquitectura del Sistema
+🏥 HISTORIA CLÍNICA DISTRIBUIDA - ARQUITECTURA CITUS
+[ Cliente psql / App ]  →  Puerto 5432
+🎯 COORDINADOR
+citus_coordinator
+:5432
+↔
+⚙️ WORKER 1
+citus_worker_1
+:5433
+↔
+⚙️ WORKER 2
+citus_worker_2
+:5434
+Red interna Docker: citus_network
+Shards distribuidos automáticamente por documento_id
+
+3.1  Distribución de Datos
+Tabla
+Clave de distribución
+Tipo Citus
+Registros demo
+usuario
+documento_id
+DISTRIBUIDA
+5
+atencion
+documento_id
+DISTRIBUIDA
+5
+tecnologia_salud
+documento_id
+DISTRIBUIDA
+3
+diagnostico
+documento_id
+DISTRIBUIDA
+4
+egreso
+documento_id
+DISTRIBUIDA
+4
+profesional_salud
+- (replicada)
+REPLICADA
+3
+
+📌 La tabla profesional_salud se replica en todos los nodos porque es pequeña y es referenciada frecuentemente en JOINs desde cualquier worker. El resto se fragmenta por documento_id para garantizar colocation.
+
+4. Prerrequisitos
+Herramienta
+Versión mínima / Notas
+Docker Desktop / Docker Engine
+v24+ (con BuildKit)
+Docker Compose
+v2.20+ (plugin integrado en Docker Desktop)
+psql (cliente PostgreSQL)
+v14+ - solo cliente, no servidor local
+Git
+Para clonar el repositorio
+RAM disponible para Docker
+Mínimo 4 GB asignados
+
+4.1  Verificar instalación
+docker --version
+docker compose version
+psql --version
+git --version
+📌 En Windows usa WSL2 + Docker Desktop. En macOS asegúrate de tener asignados al menos 4 GB de RAM en Preferences > Resources.
+
+5. Instrucciones Paso a Paso
+FASE 1 - Clonar y explorar el repositorio
+
+ACTIVIDAD 1: Clonar el repositorio
+Descarga el proyecto desde GitHub y explora la estructura de archivos.
+git clone https://github.com/jaiderreyes/historia_clinica_distribuida_citus.git
+cd historia_clinica_distribuida_citus
+ls -la
+cat docker-compose-citus.yml
+cat schema_citus.sql
+✅ Resultado esperado:
+Deben verse 4 archivos: docker-compose-citus.yml, schema_citus.sql, insert_datos.sql, README_CITUS.md. Identifica qué imagen Docker usa cada servicio y en qué puertos expone cada nodo.
+
+FASE 2 - Desplegar el clúster Citus
+
+ACTIVIDAD 2: Levantar los contenedores Docker
+Inicia los tres nodos del clúster con Docker Compose.
+docker compose -f docker-compose-citus.yml up -d
+docker compose -f docker-compose-citus.yml ps
+docker network ls | grep citus
+✅ Resultado esperado:
+Los tres servicios (citus_coordinator, citus_worker_1, citus_worker_2) deben aparecer con estado 'running'. La red citus_network debe estar visible.
+
+ACTIVIDAD 3: Verificar workers registrados
+Confirmar que el coordinador reconoce los dos workers activos.
+docker exec -it citus_coordinator psql -U admin -d historia_clinica \
+  -c "SELECT * FROM citus_get_active_worker_nodes();"
+✅ Resultado esperado:
+Deben aparecer 2 filas: worker_1:5432 y worker_2:5432. Si no aparecen, espera 15 segundos y vuelve a intentarlo.
+
+FASE 3 - Crear el esquema distribuido
+
+ACTIVIDAD 4: Activar Citus y cargar el schema
+Crea las 6 tablas y las distribuye/replica automáticamente en el clúster.
+docker exec -it citus_coordinator psql -U admin -d historia_clinica \
+  -c "CREATE EXTENSION IF NOT EXISTS citus;"
+docker exec -i citus_coordinator psql -U admin -d historia_clinica < schema_citus.sql
+✅ Resultado esperado:
+Cada sentencia create_distributed_table() y create_reference_table() debe ejecutarse sin errores. Verás mensajes 'CREATE TABLE' seguidos de las confirmaciones de distribución.
+
+ACTIVIDAD 5: Verificar distribución de shards
+Consulta el catálogo de Citus para ver cómo quedaron los shards distribuidos entre los workers.
+docker exec -it citus_coordinator psql -U admin -d historia_clinica \
+  -c "SELECT logicalrelid, shardid, nodename, nodeport FROM citus_shards ORDER BY logicalrelid, shardid;"
+✅ Resultado esperado:
+Deben aparecer múltiples filas mostrando que los shards de cada tabla están repartidos entre worker_1 y worker_2. Registra cuántos shards tiene cada tabla.
+
+FASE 4 - Insertar datos de ejemplo
+
+ACTIVIDAD 6: Cargar datos distribuidos
+Inserta los registros de prueba que Citus distribuirá automáticamente según el hash de documento_id.
+docker exec -i citus_coordinator psql -U admin -d historia_clinica < insert_datos.sql
+docker exec -it citus_coordinator psql -U admin -d historia_clinica \
+  -c "SELECT COUNT(*) FROM usuario;"
+✅ Resultado esperado:
+Se insertan pacientes, atenciones, diagnósticos, egresos y profesionales. COUNT(*) debe retornar 5. Citus enrutó cada INSERT al shard correcto de forma transparente.
+
+FASE 5 - Consultas Distribuidas
+Esta fase demuestra la transparencia de distribución: el cliente ejecuta SQL estándar y el coordinador resuelve la complejidad distribuida de forma invisible.
+
+ACTIVIDAD 7: Consulta transparente: listar pacientes
+El coordinador enruta la consulta a todos los workers y combina resultados sin que el cliente lo note.
+docker exec -it citus_coordinator psql -U admin -d historia_clinica \
+  -c "SELECT documento_id, nombre_completo, municipio_residencia FROM usuario ORDER BY documento_id;"
+✅ Resultado esperado:
+Ves todos los pacientes aunque sus filas están en nodos físicos distintos. Eso es Transparencia de Distribución: el sistema distribuido se percibe como centralizado.
+
+ACTIVIDAD 8: JOIN distribuido con colocation
+Une usuario + atencion + profesional_salud. Citus optimiza el JOIN porque user y atencion comparten clave de distribución.
+docker exec -it citus_coordinator psql -U admin -d historia_clinica -c "
+SELECT u.nombre_completo, a.entidad_salud, a.causa_atencion,
+       p.nombre AS medico, p.especialidad
+FROM usuario u
+JOIN atencion a ON u.documento_id = a.documento_id
+JOIN tecnologia_salud ts ON u.documento_id = ts.documento_id
+JOIN profesional_salud p ON ts.id_personal_salud = p.id_personal_salud
+WHERE u.documento_id > 0 ORDER BY u.nombre_completo;"
+✅ Resultado esperado:
+Resultados combinados de múltiples tablas distribuidas. El JOIN con profesional_salud es local en cada worker porque es una tabla replicada - sin tráfico de red adicional.
+
+ACTIVIDAD 9: EXPLAIN: plan de ejecución distribuido
+Analiza cómo Citus descompone y enruta la consulta entre nodos.
+docker exec -it citus_coordinator psql -U admin -d historia_clinica \
+  -c "EXPLAIN SELECT * FROM usuario WHERE municipio_residencia = 'Sincelejo';"
+✅ Resultado esperado:
+Busca en la salida: 'Custom Scan (Citus Adaptive)', 'Task Count' y 'Worker Seq Scan'. Estos términos indican que la consulta se ejecutó en paralelo en los workers.
+
+ACTIVIDAD 10: Autonomía local: consulta directa al worker
+Verifica que cada worker puede responder consultas de sus shards sin pasar por el coordinador.
+docker exec -it citus_worker_1 psql -U admin -d historia_clinica \
+  -c "SELECT tablename FROM pg_tables WHERE schemaname = 'public';"
+docker exec -it citus_worker_2 psql -U admin -d historia_clinica \
+  -c "SELECT tablename FROM pg_tables WHERE schemaname = 'public';"
+✅ Resultado esperado:
+Cada worker muestra sus shards locales (tablas con sufijos numéricos como usuario_102008). Eso demuestra Autonomía Local: cada nodo procesa sus datos de forma independiente.
+
+FASE 6 - Tolerancia a Fallos: Simulación de Caída de Nodo
+Esta fase es el corazón del laboratorio de sistemas distribuidos. El estudiante va a provocar el fallo de un nodo, observar el impacto real en el clúster, diagnosticar los shards afectados mediante el catálogo de Citus y recuperar el sistema. Este proceso ilustra directamente los conceptos de disponibilidad, replicación y el Teorema CAP.
+
+⚠️ Ejecuta esta fase con atención. Los comandos tienen efectos reales sobre los contenedores. Lee cada resultado antes de pasar al siguiente paso.
+
+Subfase A - Estado inicial y baseline
+Subfase A - Capturar estado inicial del clúster
+docker exec -it citus_coordinator psql -U admin -d historia_clinica \
+  -c "SELECT nodename, nodeport, isactive FROM pg_dist_node ORDER BY nodeid;"
+docker exec -it citus_coordinator psql -U admin -d historia_clinica \
+  -c "SELECT shardid, nodename, shardstate FROM pg_dist_shard_placement LIMIT 10;"
+docker exec -it citus_coordinator psql -U admin -d historia_clinica \
+  -c "SELECT COUNT(*) AS total_pacientes FROM usuario;"
+✅ Dos nodos activos (isactive=t), todos los shards con shardstate=1 (activo), COUNT=5 pacientes.
+🔍 Qué observar: Guarda capturas de pantalla de TODOS los resultados. Son el baseline contra el que compararás el estado post-fallo.
+
+Subfase B - Simular caída del worker_1
+Subfase B - Detener el worker_1 y observar impacto inmediato
+# Simular caída del worker_1
+docker stop citus_worker_1
+
+# Esperar 3 segundos y consultar inmediatamente
+sleep 3
+
+# Consulta que afecta shards del worker caído
+docker exec -it citus_coordinator psql -U admin -d historia_clinica \
+  -c "SELECT documento_id, nombre_completo FROM usuario ORDER BY documento_id;"
+✅ Dependiendo de qué shards estaban en worker_1, verás error parcial 'could not connect to server' para los shards afectados, o respuesta completa si todos los shards requeridos estaban en worker_2.
+🔍 Qué observar: Registra exactamente el mensaje de error. ¿Qué datos quedaron inaccesibles? ¿Por qué el coordinador no puede servir esos shards?
+
+Subfase C - Diagnóstico de shards afectados
+Subfase C - Identificar qué shards y tablas quedaron sin servicio
+docker exec -it citus_coordinator psql -U admin -d historia_clinica -c "
+SELECT s.logicalrelid AS tabla,
+       p.shardid,
+       p.nodename AS nodo_caido,
+       p.shardstate,
+       CASE p.shardstate
+         WHEN 1 THEN 'ACTIVO'
+         WHEN 3 THEN 'INACTIVO/ROTO'
+         ELSE 'DESCONOCIDO'
+       END AS estado
+FROM pg_dist_shard_placement p
+JOIN citus_shards s USING (shardid)
+WHERE p.nodename LIKE '%worker_1%'
+ORDER BY s.logicalrelid, p.shardid;"
+✅ Lista de shards con estado=3 (inactivos) que pertenecían al worker_1. Muestra exactamente qué tablas y qué fragmentos de datos quedaron afectados.
+🔍 Qué observar: ¿Cuántos shards afectó la caída? ¿Qué tablas tienen shards en worker_1? ¿Qué porcentaje del total de datos quedó inaccesible?
+
+Subfase D - Consultas con nodo caído
+Subfase D - Explorar qué consultas siguen funcionando y cuáles fallan
+# Intentar contar todos los pacientes
+docker exec -it citus_coordinator psql -U admin -d historia_clinica \
+  -c "SELECT COUNT(*) FROM usuario;"
+
+# Consultar la tabla replicada (debe seguir funcionando)
+docker exec -it citus_coordinator psql -U admin -d historia_clinica \
+  -c "SELECT * FROM profesional_salud;"
+
+# Intentar consultar worker_2 directamente (autonomía local)
+docker exec -it citus_worker_2 psql -U admin -d historia_clinica \
+  -c "SELECT COUNT(*) FROM usuario_102009;"
+✅ profesional_salud responde correctamente (tabla replicada en todos los nodos). worker_2 puede servir sus shards locales de forma autónoma. Las consultas que requieren shards de worker_1 fallan.
+🔍 Qué observar: Esta es la diferencia entre una tabla replicada y una distribuida en términos de disponibilidad. ¿Qué dice el Teorema CAP sobre este comportamiento?
+
+Subfase E - Recuperación del nodo
+Subfase E - Restaurar el worker_1 y reactivar en el coordinador
+# Reiniciar el contenedor del worker_1
+docker start citus_worker_1
+
+# Esperar que PostgreSQL dentro del contenedor esté listo
+sleep 8
+
+# Reactivar el nodo en el coordinador
+docker exec -it citus_coordinator psql -U admin -d historia_clinica \
+  -c "SELECT citus_activate_node('citus_worker_1', 5432);"
+
+# Verificar que todos los shards vuelven a estado activo
+docker exec -it citus_coordinator psql -U admin -d historia_clinica \
+  -c "SELECT shardstate, COUNT(*) FROM pg_dist_shard_placement GROUP BY shardstate ORDER BY shardstate;"
+✅ citus_activate_node retorna 'OK'. Todos los shards deben volver a shardstate=1. COUNT(*) de usuario debe retornar 5 nuevamente.
+🔍 Qué observar: ¿Cuánto tiempo tardó la recuperación? ¿Hubo pérdida de datos? ¿Qué implicaciones tiene para un sistema de salud real el tiempo en que los datos estuvieron inaccesibles?
+
+Subfase F - Verificación final del clúster restaurado
+ACTIVIDAD 11: Validación completa post-recuperación
+Confirma que el clúster volvió a su estado operativo completo.
+docker exec -it citus_coordinator psql -U admin -d historia_clinica \
+  -c "SELECT * FROM citus_get_active_worker_nodes();"
+docker exec -it citus_coordinator psql -U admin -d historia_clinica \
+  -c "SELECT COUNT(*) FROM usuario;"
+docker exec -it citus_coordinator psql -U admin -d historia_clinica \
+  -c "SELECT DISTINCT shardstate FROM pg_dist_shard_placement;"
+✅ Resultado esperado:
+2 workers activos, COUNT=5 pacientes, único shardstate=1 en todos los placements. El clúster está completamente restaurado.
+
+6. Preguntas de Análisis y Reflexión
+Responde en tu informe con argumentos técnicos. Mínimo 150 palabras por pregunta. Estas preguntas están directamente vinculadas a los Resultados de Aprendizaje y son evaluadas como parte de la nota final.
+
+Transparencia (RA3)
+1. ¿Qué diferencia existe entre conectarse al coordinador vs. conectarse directamente a un worker? ¿Por qué el cliente no necesita conocer la ubicación física de cada shard?
+2. Si agregaras un tercer worker, ¿qué cambiaría en el código SQL de la aplicación cliente? Justifica tu respuesta con base en el concepto de transparencia de distribución.
+
+Particionamiento y Replicación (RA2)
+3. ¿Por qué documento_id fue elegido como clave de distribución y no, por ejemplo, atencion_id? Explica usando el concepto de colocation y su impacto en los JOINs.
+4. ¿Cuál es la diferencia técnica entre create_distributed_table y create_reference_table? ¿Cuándo usarías cada una en un sistema de salud real tipo RIPS Colombia?
+
+Tolerancia a Fallos y CAP (RA5)
+5. Documenta y explica lo que observaste en la Subfase B: ¿qué consultas fallaron y por qué? ¿Qué datos permanecieron accesibles? ¿Qué diferencia haría tener citus.replication_factor=2?
+6. Clasifica este sistema dentro del Teorema CAP (Consistencia, Disponibilidad, Tolerancia a Particiones) según el comportamiento observado durante la caída del worker_1. Justifica cada dimensión con evidencia del laboratorio.
+
+Autonomía Local (RA3 / RA5)
+7. En la Subfase D te conectaste directamente a worker_2 y ejecutaste una consulta. ¿Por qué ese worker podía responder de forma autónoma sin el coordinador? ¿Qué limitaciones tiene esa autonomía?
+8. Para un sistema de Historia Clínica en red como SEYSA IPS, ¿qué estrategia de distribución recomendarías si cada sede tiene pacientes locales pero también atiende pacientes de otras sedes? Fundamenta tu propuesta con los conceptos del laboratorio.
+
+7. Limpieza del Entorno
+⚠️ Ejecuta estos comandos al finalizar el laboratorio para liberar recursos del sistema.
+
+ACTIVIDAD 12: Detener y eliminar el clúster completo
+Limpia todos los contenedores, volúmenes y red virtual creados por el laboratorio.
+docker compose -f docker-compose-citus.yml down -v
+docker volume prune -f
+docker network prune -f
+docker compose -f docker-compose-citus.yml ps
+✅ Resultado esperado:
+Todos los contenedores Citus eliminados. Los datos son efímeros (no hay bind mounts persistentes). La última línea no debe mostrar ningún servicio.
+
+8. Entregables
+Sube al LMS (Moodle) un archivo .zip con la siguiente estructura. La ausencia de cualquier entregable afecta directamente la nota final:
+9. Informe PDF o DOCX con capturas de pantalla de CADA actividad numerada (1-12), incluyendo las 6 subfases de la Fase 6.
+10. Respuestas argumentadas a las 8 preguntas de análisis (mínimo 150 palabras cada una, con referencias a evidencia observada en el laboratorio).
+11. Archivo con las consultas SQL adicionales que ejecutaste durante el diagnóstico de la Fase 6.
+12. Reflexión final (mínimo 300 palabras): ¿cómo aplicarías lo aprendido en un sistema de interoperabilidad en salud como FHIR R4 o RIPS?
+
+📌 Las capturas deben mostrar claramente el comando ejecutado y la salida completa. Incluye siempre la línea del prompt para que sea evidente que ejecutaste el comando tú mismo.
+
+9. Rúbrica de Evaluación (Escala 0.0 - 5.0)
+La nota final del laboratorio se obtiene promediando los cinco criterios. Cada criterio se evalúa en escala continua de 0.0 a 5.0 según la escala descriptiva adjunta. No existen bonificaciones: el puntaje máximo 5.0 se obtiene completando todos los criterios con calidad.
+
+Criterio
+RA vinculado
+Evidencia requerida
+Escala
+Despliegue del clúster
+RA1
+Tres nodos levantados, workers registrados, extensión Citus activa
+0.0 - 5.0
+Schema distribuido correcto
+RA2
+6 tablas creadas con distribución/replicación apropiada y shards verificados
+0.0 - 5.0
+Consultas distribuidas
+RA3 / RA4
+Mínimo 3 consultas ejecutadas + interpretación de EXPLAIN con análisis escrito
+0.0 - 5.0
+Tolerancia a fallos
+RA5
+Simulación de caída completa: diagnóstico, shards afectados y recuperación documentada
+0.0 - 5.0
+Análisis y argumentación
+RA6
+Respuestas a las 8 preguntas con argumentos técnicos, mínimo 150 palabras c/u
+0.0 - 5.0
+Escala descriptiva de valoración
+5.0
+Evidencia completa, correcta y bien documentada. Análisis profundo con conceptos teóricos.
+4.0 - 4.9
+Evidencia completa con pequeños errores no conceptuales. Análisis sólido.
+3.0 - 3.9
+Evidencia parcial o con errores menores. Análisis básico pero correcto.
+1.0 - 2.9
+Evidencia incompleta o con errores conceptuales. Análisis superficial.
+0.0
+Sin evidencia o entrega fuera del plazo sin justificación.
+
+📌 La Fase 6 (Tolerancia a Fallos) aporta al criterio de mayor peso formativo. Un informe sin las capturas y el análisis de la subfase B-E no puede alcanzar nota aprobatoria (3.0).
+
+10. Referencias
+• Citus Documentation - citusdata.com/docs
+• Özsu, M.T. & Valduriez, P. (2020). Principles of Distributed Database Systems (4th ed.). Springer.
+• PostgreSQL 15 Documentation - postgresql.org/docs/15
+• Tanenbaum, A.S. & Van Steen, M. (2017). Distributed Systems: Principles and Paradigms (3rd ed.). Pearson.
+• Brewer, E. (2012). CAP Twelve Years Later: How the Rules Have Changed. IEEE Computer, 45(2), 23-29.
+• Repositorio del laboratorio: github.com/jaiderreyes/historia_clinica_distribuida_citus
+
+Universidad UAJS ·  Ingeniería de Sistemas  ·  Sistemas Distribuidos
+Jaider Enrique Reyes Herazo  ·  jaiderreyes.com  ·  Escala 0.0 - 5.0
+SISTEMAS DISTRIBUIDOS  |  Lab 5: Historia Clínica Distribuida con PostgreSQL + Citus
+
+UAJS  |  Jaider Reyes - Docente Ing. Sistemas	Pág. 1
+
