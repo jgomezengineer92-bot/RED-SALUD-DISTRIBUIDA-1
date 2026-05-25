@@ -475,9 +475,8 @@ def registro_medicamentos():
             documento_id, atencion_id, descripcion_medicamento, dosis,
             via_administracion, frecuencia, dias_tratamiento, unidades_aplicadas,
             id_personal_salud, finalidad_tecnologia,
-            tipo_diagnostico_ingreso, diagnostico_ingreso, tipo_diagnostico_egreso,
-            diagnostico_ingreso_cie11
-        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            tipo_diagnostico_ingreso, diagnostico_ingreso, tipo_diagnostico_egreso
+        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
     """
     import uuid
     id_profesional = data.get('id_personal_salud')
@@ -515,8 +514,7 @@ def registro_medicamentos():
         data.get('finalidad_tecnologia'),
         data.get('tipo_diagnostico_ingreso'),
         diagnostico_cie10,
-        data.get('tipo_diagnostico_egreso'),
-        diagnostico_cie11
+        data.get('tipo_diagnostico_egreso')
     )
     try:
         conn = citus_conn()

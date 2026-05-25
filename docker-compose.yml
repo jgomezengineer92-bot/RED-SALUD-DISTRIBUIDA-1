@@ -105,6 +105,10 @@ services:
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
   grafana:
     image: grafana/grafana:latest
@@ -119,6 +123,62 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning
     depends_on:
       - prometheus
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  # ==============================
+  # CouchDB Exporters — Prometheus
+  # Traduce métricas de JSON nativo a formato Prometheus
+  # ==============================
+  couchdb-exporter-guajira:
+    image: gesellix/couchdb-prometheus-exporter:latest
+    container_name: couchdb-exporter-guajira
+    environment:
+      - COUCHDB_URI=http://guajira_db:5984
+      - COUCHDB_USERNAME=admin
+      - COUCHDB_PASSWORD=admin
+    ports: ["9984:9984"]
+    depends_on:
+      - guajira_db
+    restart: unless-stopped
+
+  couchdb-exporter-amazonas:
+    image: gesellix/couchdb-prometheus-exporter:latest
+    container_name: couchdb-exporter-amazonas
+    environment:
+      - COUCHDB_URI=http://amazonas_db:5984
+      - COUCHDB_USERNAME=admin123
+      - COUCHDB_PASSWORD=admin123
+    ports: ["9985:9984"]
+    depends_on:
+      - amazonas_db
+    restart: unless-stopped
+
+  couchdb-exporter-guainia:
+    image: gesellix/couchdb-prometheus-exporter:latest
+    container_name: couchdb-exporter-guainia
+    environment:
+      - COUCHDB_URI=http://guainia_db:5984
+      - COUCHDB_USERNAME=admin
+      - COUCHDB_PASSWORD=admin
+    ports: ["9986:9984"]
+    depends_on:
+      - guainia_db
+    restart: unless-stopped
+
+  couchdb-exporter-narino:
+    image: gesellix/couchdb-prometheus-exporter:latest
+    container_name: couchdb-exporter-narino
+    environment:
+      - COUCHDB_URI=http://narino_db:5984
+      - COUCHDB_USERNAME=admin
+      - COUCHDB_PASSWORD=admin
+    ports: ["9987:9984"]
+    depends_on:
+      - narino_db
     restart: unless-stopped
 
   # ==============================

@@ -52,11 +52,19 @@ function App() {
     entorno_atencion: 'Consulta', via_ingreso: 'Espontáneo', causa_atencion: '',
     fecha_triage: '', clasificacion_triage: '', comunidad_etnica: ''
   });
+  // Catálogo de profesionales de salud cargados desde la BD
+  const PROFESIONALES_SALUD = [
+    { id: 'aa7e532a-5b3a-4cbe-934a-d01a80e01b0f', nombre: 'Dra. Andrea Borrero Ruiz', especialidad: 'Medicina Interna' },
+    { id: '7b114f06-b03c-4c63-b0dd-6eed82ff9e04', nombre: 'Dr. Luis Enrique Pineda', especialidad: 'Urgencias y Emergencias' },
+    { id: '395385d8-87c4-4d66-9a61-19f11e688970', nombre: 'Enf. Camila Hoyos Salas', especialidad: 'Enfermería Clínica' },
+    { id: '02bf23ad-b7b3-4dcf-9f9f-51ce1a14645a', nombre: 'Dr. Hernán Díaz Ospina', especialidad: 'Medicina General' },
+  ];
   // SECCIÓN 3: Tecnologías en Salud / Medicamentos (campos 25-35)
   const [seccion3, setSeccion3] = useState({
     descripcion_medicamento: '', dosis: '', via_administracion: 'Oral',
-    frecuencia: '', dias_tratamiento: '', unidades_aplicadas: 0,
-    id_personal_salud: '', finalidad_tecnologia: 'Terapéutica',
+    frecuencia: 'Cada 8 horas', dias_tratamiento: 1, unidades_aplicadas: 1,
+    id_personal_salud: 'aa7e532a-5b3a-4cbe-934a-d01a80e01b0f',
+    finalidad_tecnologia: 'Terapéutica',
     tipo_diagnostico_ingreso: 'Confirmado', diagnostico_ingreso: 'Z00', tipo_diagnostico_egreso: 'Confirmado'
   });
   // SECCIÓN 4: Diagnósticos CIE-10 (campos 36-39)
@@ -704,8 +712,8 @@ function App() {
                     <h3><span className="num">03</span> Tecnologías en Salud / Medicamentos <small>(Campos 25–35)</small></h3>
                     <div className="grid-3">
                       <div className="field" style={{gridColumn:'span 2'}}>
-                        <label>25. Medicamento / Tecnología</label>
-                        <input type="text" name="descripcion_medicamento" data-sec="s3" value={seccion3.descripcion_medicamento} onChange={handleChange} placeholder="ej: Acetaminofén 500mg" />
+                        <label>25. Medicamento / Tecnología *</label>
+                        <input type="text" name="descripcion_medicamento" data-sec="s3" value={seccion3.descripcion_medicamento} onChange={handleChange} placeholder="ej: Acetaminofén 500mg" required />
                       </div>
                       <div className="field">
                         <label>26. Dosis</label>
@@ -722,16 +730,21 @@ function App() {
                         <input type="text" name="frecuencia" data-sec="s3" value={seccion3.frecuencia} onChange={handleChange} placeholder="ej: Cada 8 horas" />
                       </div>
                       <div className="field">
-                        <label>29. Días de Tratamiento</label>
-                        <input type="number" name="dias_tratamiento" data-sec="s3" value={seccion3.dias_tratamiento} onChange={handleChange} />
+                        <label>29. Días de Tratamiento *</label>
+                        <input type="number" name="dias_tratamiento" data-sec="s3" value={seccion3.dias_tratamiento} onChange={handleChange} min="1" required />
                       </div>
                       <div className="field">
-                        <label>30. Unidades Aplicadas</label>
-                        <input type="number" name="unidades_aplicadas" data-sec="s3" value={seccion3.unidades_aplicadas} onChange={handleChange} />
+                        <label>30. Unidades Aplicadas *</label>
+                        <input type="number" name="unidades_aplicadas" data-sec="s3" value={seccion3.unidades_aplicadas} onChange={handleChange} min="0" required />
                       </div>
                       <div className="field">
-                        <label>31. ID Personal de Salud</label>
-                        <input type="text" name="id_personal_salud" data-sec="s3" value={seccion3.id_personal_salud} onChange={handleChange} placeholder="Cédula o código UUID" />
+                        <label>31. Profesional de Salud *</label>
+                        <select name="id_personal_salud" data-sec="s3" value={seccion3.id_personal_salud} onChange={handleChange} required>
+                          <option value="">-- Seleccione profesional --</option>
+                          {PROFESIONALES_SALUD.map(p => (
+                            <option key={p.id} value={p.id}>{p.nombre} · {p.especialidad}</option>
+                          ))}
+                        </select>
                       </div>
                       <div className="field">
                         <label>32. Finalidad de la Tecnología</label>
