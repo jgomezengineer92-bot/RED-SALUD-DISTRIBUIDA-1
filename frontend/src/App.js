@@ -442,23 +442,35 @@ function App() {
   // ==========================================
   return (
     <div className="App-container">
-      <nav className="nav-bar">
-        <div className="nav-brand">🛡️ P2P HEALTH UAJS</div>
-        <div className="nav-links">
-          <button className={paginaActual === 'recepcion' ? 'btn-nav active' : 'btn-nav'} onClick={() => {setPaginaActual('recepcion'); setMessage(null);}}>👩‍💻 Recepción</button>
-          <button className={paginaActual === 'registro' ? 'btn-nav active' : 'btn-nav'} onClick={() => {setPaginaActual('registro'); setMessage(null);}}>📋 Historia Clínica</button>
-          <button className={paginaActual === 'consulta_hc' ? 'btn-nav active' : 'btn-nav'} onClick={() => {setPaginaActual('consulta_hc'); setMessage(null);}}>📄 Consulta HC</button>
-          <button className={paginaActual === 'reportes' ? 'btn-nav active' : 'btn-nav'} onClick={() => {setPaginaActual('reportes'); setMessage(null);}}>📊 Reportes</button>
-          <button className={paginaActual === 'control' ? 'btn-nav active' : 'btn-nav'} onClick={() => {setPaginaActual('control'); setMessage(null);}}>⚙️ Nodos P2P</button>
+      <div className="colombia-stripe">
+        <div className="stripe-yellow"></div>
+        <div className="stripe-blue"></div>
+        <div className="stripe-red"></div>
+      </div>
+      
+      <header className="top-navbar">
+        <div className="nav-brand">
+          <span className="brand-icon">🏥</span>
+          <div className="brand-text">
+            <strong>RED SALUD</strong>
+            <span>P2P Distribuida</span>
+          </div>
         </div>
-      </nav>
+        <nav className="nav-links">
+          <button className={paginaActual === 'recepcion' ? 'btn-nav active' : 'btn-nav'} onClick={() => {setPaginaActual('recepcion'); setMessage(null);}}>Recepción</button>
+          <button className={paginaActual === 'registro' ? 'btn-nav active' : 'btn-nav'} onClick={() => {setPaginaActual('registro'); setMessage(null);}}>Historia Clínica</button>
+          <button className={paginaActual === 'consulta_hc' ? 'btn-nav active' : 'btn-nav'} onClick={() => {setPaginaActual('consulta_hc'); setMessage(null);}}>Consulta HC</button>
+          <button className={paginaActual === 'reportes' ? 'btn-nav active' : 'btn-nav'} onClick={() => {setPaginaActual('reportes'); setMessage(null);}}>Reportes</button>
+          <button className={paginaActual === 'control' ? 'btn-nav active' : 'btn-nav'} onClick={() => {setPaginaActual('control'); setMessage(null);}}>Nodos P2P</button>
+        </nav>
+      </header>
 
       <main className="main-card">
         {paginaActual === 'recepcion' && (
           <div className="fade-in">
             <div className="header">
-              <h1>🏥 HISTORIA CLÍNICA DISTRIBUIDA — 57 CAMPOS</h1>
-              <p>Resolución 866 de 2021 · MinSalud Colombia · Postgres Citus + CouchDB P2P | <strong>{sedeVisualizacion.nombre}</strong></p>
+              <h1>RECEPCION</h1>
+              <p><strong>{sedeVisualizacion.nombre}</strong></p>
             </div>
 
             {/* ── BÚSQUEDA FEDERADA P2P ── */}
@@ -955,8 +967,8 @@ function App() {
             </div>
 
             <div className="header">
-              <h1>RED NACIONAL DE SALUD PEER TO PEER </h1>
-              <p>Pilar de Integridad ISO 27001 | <strong>{paciente.municipioResidencia}</strong></p>
+              <h1>HISTORIAL PACIENTE NACIONAL</h1>
+              <p><strong>{sedeVisualizacion.nombre}</strong></p>
             </div>
 
             <div className="form-container">
@@ -1027,9 +1039,7 @@ function App() {
               {/* UBICACIÓN: Al final de todo el formulario, antes del botón de cierre */}
 
               <div className="rate-limit-container">
-                <div className="tokens-badge">
-                  🛡️ Seguridad: <strong>{tokens}</strong> peticiones restantes
-                </div>
+
 
                 {bloqueado && (
                   <div className="cooldown-alert">
@@ -1112,7 +1122,6 @@ function App() {
           <div className="nodos-container fade-in">
             <div className="admin-header">
               <h2>CENTRO DE CONTROL SOBERANO</h2>
-              <p>Simulación de Ataques a la Disponibilidad (ISO 27001)</p>
             </div>
             <div className="nodos-grid-admin">
               {SEDES.map((s, i) => (
@@ -1186,8 +1195,7 @@ function ConsultaHC({ sedeVisualizacion, SEDES }) {
   return (
     <div className="fade-in">
       <div className="header">
-        <h1>📄 CONSULTA DE HISTORIA CLÍNICA CONSOLIDADA</h1>
-        <p>Requisito 4.4 — Vista completa cruzando los 3 nodos</p>
+        <h1>CONSULTAR PACIENTE</h1>
       </div>
       <div className="p2p-search-card">
         <div className="p2p-search-row">
@@ -1288,7 +1296,11 @@ function DashboardReportes({ sedeVisualizacion, SEDES, saludRed }) {
       for (const s of SEDES) {
         try {
           const r = await fetch(`${s.url}/health/full`, { signal: AbortSignal.timeout(5000) });
-          h[s.nombre] = r.ok ? await r.json() : { couchdb: 'unknown', citus: 'unknown', hapi_fhir: 'unknown' };
+          if (r.headers.get('content-type')?.includes('application/json')) {
+            h[s.nombre] = await r.json();
+          } else {
+            h[s.nombre] = r.ok ? await r.json() : { couchdb: 'unknown', citus: 'unknown', hapi_fhir: 'unknown' };
+          }
         } catch { h[s.nombre] = { couchdb: 'offline', citus: 'offline', hapi_fhir: 'offline' }; }
       }
       setHealthNodes(h);
@@ -1320,8 +1332,8 @@ function DashboardReportes({ sedeVisualizacion, SEDES, saludRed }) {
   return (
     <div className="fade-in">
       <div className="header">
-        <h1>📊 DASHBOARD DE REPORTES — RED SALUD DISTRIBUIDA</h1>
-        <p>Requisito 4.5 — Métricas en tiempo real | Auto-refresh cada 15s | Nodo activo: <strong>{sedeVisualizacion.nombre}</strong></p>
+        <h1>TABLA DE REGISTROS HISTORICO</h1>
+        <p><strong>{sedeVisualizacion.nombre}</strong></p>
       </div>
 
       {cargando && <div className="alert success">⏳ Cargando métricas...</div>}
